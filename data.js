@@ -1,0 +1,77 @@
+// Banco de dados de exercícios — frações de envolvimento muscular somam ~1.
+// ponytail: frações são heurísticas de literatura de treino, não EMG; ajuste fino é do modelo de recuperação, não daqui.
+
+const MUSCULOS = [
+  { id: 'peito',        nome: 'Peitoral' },
+  { id: 'costas',       nome: 'Costas (dorsais)' },
+  { id: 'trapezio',     nome: 'Trapézio' },
+  { id: 'ombros',       nome: 'Ombros (deltoides)' },
+  { id: 'biceps',       nome: 'Bíceps' },
+  { id: 'triceps',      nome: 'Tríceps' },
+  { id: 'antebraco',    nome: 'Antebraço' },
+  { id: 'abdomen',      nome: 'Abdômen' },
+  { id: 'lombar',       nome: 'Lombar' },
+  { id: 'gluteos',      nome: 'Glúteos' },
+  { id: 'quadriceps',   nome: 'Quadríceps' },
+  { id: 'posteriores',  nome: 'Posteriores de coxa' },
+  { id: 'adutores',     nome: 'Adutores' },
+  { id: 'panturrilha',  nome: 'Panturrilha' },
+];
+
+const EXERCICIOS = [
+  // Peito
+  { id: 'supino_reto',        cat: 'Peito',  nome: 'Supino reto (barra)',        musculos: { peito: .60, triceps: .25, ombros: .15 } },
+  { id: 'supino_halteres',    cat: 'Peito',  nome: 'Supino reto (halteres)',     musculos: { peito: .60, triceps: .20, ombros: .20 } },
+  { id: 'supino_inclinado',   cat: 'Peito',  nome: 'Supino inclinado',           musculos: { peito: .55, ombros: .25, triceps: .20 } },
+  { id: 'supino_declinado',   cat: 'Peito',  nome: 'Supino declinado',           musculos: { peito: .65, triceps: .25, ombros: .10 } },
+  { id: 'crucifixo',          cat: 'Peito',  nome: 'Crucifixo / peck deck',      musculos: { peito: .85, ombros: .15 } },
+  { id: 'crossover',          cat: 'Peito',  nome: 'Crossover (polia)',          musculos: { peito: .85, ombros: .15 } },
+  { id: 'flexao',             cat: 'Peito',  nome: 'Flexão de braço',            musculos: { peito: .55, triceps: .25, ombros: .15, abdomen: .05 } },
+  { id: 'paralelas',          cat: 'Peito',  nome: 'Mergulho nas paralelas',     musculos: { triceps: .50, peito: .35, ombros: .15 } },
+  { id: 'pullover',           cat: 'Peito',  nome: 'Pullover',                   musculos: { costas: .45, peito: .40, triceps: .15 } },
+  // Costas
+  { id: 'puxada_frontal',     cat: 'Costas', nome: 'Puxada frontal (pulley)',    musculos: { costas: .65, biceps: .25, ombros: .10 } },
+  { id: 'barra_fixa',         cat: 'Costas', nome: 'Barra fixa',                 musculos: { costas: .60, biceps: .25, antebraco: .10, abdomen: .05 } },
+  { id: 'remada_curvada',     cat: 'Costas', nome: 'Remada curvada',             musculos: { costas: .55, biceps: .20, trapezio: .15, lombar: .10 } },
+  { id: 'remada_baixa',       cat: 'Costas', nome: 'Remada baixa (polia)',       musculos: { costas: .60, biceps: .25, trapezio: .15 } },
+  { id: 'remada_maquina',     cat: 'Costas', nome: 'Remada máquina',             musculos: { costas: .65, biceps: .20, trapezio: .15 } },
+  { id: 'serrote',            cat: 'Costas', nome: 'Remada unilateral (serrote)',musculos: { costas: .60, biceps: .20, trapezio: .10, lombar: .10 } },
+  { id: 'levantamento_terra', cat: 'Costas', nome: 'Levantamento terra',         musculos: { lombar: .25, gluteos: .25, posteriores: .25, costas: .10, trapezio: .10, quadriceps: .05 } },
+  { id: 'hiperextensao',      cat: 'Costas', nome: 'Hiperextensão lombar',       musculos: { lombar: .60, gluteos: .25, posteriores: .15 } },
+  { id: 'encolhimento',       cat: 'Costas', nome: 'Encolhimento de ombros',     musculos: { trapezio: .90, antebraco: .10 } },
+  // Ombros
+  { id: 'desenvolvimento',    cat: 'Ombros', nome: 'Desenvolvimento (militar)',  musculos: { ombros: .65, triceps: .25, trapezio: .10 } },
+  { id: 'desenv_maquina',     cat: 'Ombros', nome: 'Desenvolvimento máquina',    musculos: { ombros: .70, triceps: .25, trapezio: .05 } },
+  { id: 'elevacao_lateral',   cat: 'Ombros', nome: 'Elevação lateral',           musculos: { ombros: .90, trapezio: .10 } },
+  { id: 'elevacao_frontal',   cat: 'Ombros', nome: 'Elevação frontal',           musculos: { ombros: .90, trapezio: .10 } },
+  { id: 'crucifixo_inverso',  cat: 'Ombros', nome: 'Crucifixo inverso',          musculos: { ombros: .60, costas: .20, trapezio: .20 } },
+  { id: 'remada_alta',        cat: 'Ombros', nome: 'Remada alta',                musculos: { trapezio: .50, ombros: .40, biceps: .10 } },
+  // Braços
+  { id: 'rosca_direta',       cat: 'Braços', nome: 'Rosca direta (barra)',       musculos: { biceps: .80, antebraco: .20 } },
+  { id: 'rosca_alternada',    cat: 'Braços', nome: 'Rosca alternada (halteres)', musculos: { biceps: .80, antebraco: .20 } },
+  { id: 'rosca_martelo',      cat: 'Braços', nome: 'Rosca martelo',              musculos: { biceps: .60, antebraco: .40 } },
+  { id: 'rosca_scott',        cat: 'Braços', nome: 'Rosca Scott',                musculos: { biceps: .90, antebraco: .10 } },
+  { id: 'triceps_pulley',     cat: 'Braços', nome: 'Tríceps pulley / corda',     musculos: { triceps: .95, antebraco: .05 } },
+  { id: 'triceps_testa',      cat: 'Braços', nome: 'Tríceps testa',              musculos: { triceps: 1 } },
+  { id: 'triceps_frances',    cat: 'Braços', nome: 'Tríceps francês',            musculos: { triceps: 1 } },
+  { id: 'rosca_punho',        cat: 'Braços', nome: 'Rosca de punho',             musculos: { antebraco: 1 } },
+  // Pernas
+  { id: 'agachamento',        cat: 'Pernas', nome: 'Agachamento livre',          musculos: { quadriceps: .45, gluteos: .30, posteriores: .10, lombar: .10, abdomen: .05 } },
+  { id: 'agachamento_smith',  cat: 'Pernas', nome: 'Agachamento no Smith',       musculos: { quadriceps: .50, gluteos: .30, posteriores: .10, lombar: .10 } },
+  { id: 'hack',               cat: 'Pernas', nome: 'Hack squat',                 musculos: { quadriceps: .55, gluteos: .25, posteriores: .20 } },
+  { id: 'leg_press',          cat: 'Pernas', nome: 'Leg press',                  musculos: { quadriceps: .55, gluteos: .30, posteriores: .15 } },
+  { id: 'extensora',          cat: 'Pernas', nome: 'Cadeira extensora',          musculos: { quadriceps: 1 } },
+  { id: 'flexora',            cat: 'Pernas', nome: 'Cadeira / mesa flexora',     musculos: { posteriores: .90, panturrilha: .10 } },
+  { id: 'stiff',              cat: 'Pernas', nome: 'Stiff',                      musculos: { posteriores: .50, gluteos: .30, lombar: .20 } },
+  { id: 'afundo',             cat: 'Pernas', nome: 'Afundo / avanço',            musculos: { quadriceps: .40, gluteos: .40, posteriores: .15, panturrilha: .05 } },
+  { id: 'bulgaro',            cat: 'Pernas', nome: 'Agachamento búlgaro',        musculos: { quadriceps: .40, gluteos: .40, posteriores: .20 } },
+  { id: 'elevacao_pelvica',   cat: 'Pernas', nome: 'Elevação pélvica (hip thrust)', musculos: { gluteos: .70, posteriores: .25, lombar: .05 } },
+  { id: 'abdutora',           cat: 'Pernas', nome: 'Cadeira abdutora',           musculos: { gluteos: 1 } },
+  { id: 'adutora',            cat: 'Pernas', nome: 'Cadeira adutora',            musculos: { adutores: 1 } },
+  { id: 'panturrilha_pe',     cat: 'Pernas', nome: 'Panturrilha em pé',          musculos: { panturrilha: 1 } },
+  { id: 'panturrilha_sentado',cat: 'Pernas', nome: 'Panturrilha sentado',        musculos: { panturrilha: 1 } },
+  // Core
+  { id: 'abdominal',          cat: 'Core',   nome: 'Abdominal (crunch / máquina)', musculos: { abdomen: 1 } },
+  { id: 'prancha',            cat: 'Core',   nome: 'Prancha (reps = segundos)',  musculos: { abdomen: .70, lombar: .20, ombros: .10 } },
+  { id: 'elevacao_pernas',    cat: 'Core',   nome: 'Elevação de pernas',         musculos: { abdomen: .90, quadriceps: .10 } },
+];

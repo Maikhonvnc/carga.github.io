@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0d0d">
+<title>Carga — Diário de Treino</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+:root{
+  --pagina:#0d0d0d; --card:#1a1a19; --borda:rgba(255,255,255,.10);
+  --ink:#ffffff; --ink2:#c3c2b7; --mudo:#898781; --grade:#2c2c2a;
+  --azul:#3987e5; --aqua:#199e70;
+  --bom:#0ca30c; --atencao:#fab219; --serio:#ec835a; --critico:#d03b3b;
+}
+*{box-sizing:border-box;margin:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--pagina);color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+  max-width:560px;margin:0 auto;
+  padding:12px 12px calc(76px + env(safe-area-inset-bottom));
+}
+h1{font-size:1.25rem;padding:4px 2px 12px}
+h1 small{color:var(--mudo);font-weight:400;font-size:.8rem;margin-left:6px}
+h2{font-size:1.05rem;margin-bottom:10px}
+h3{font-size:.95rem;margin-bottom:8px}
+section[hidden]{display:none}
+.card{background:var(--card);border:1px solid var(--borda);border-radius:12px;padding:14px;margin-bottom:12px}
+.mudo{color:var(--mudo);font-size:.85rem}
+.ink2{color:var(--ink2)}
+label{display:block;font-size:.8rem;color:var(--ink2);margin:8px 0 4px}
+input,select,textarea{
+  width:100%;padding:10px;border-radius:8px;border:1px solid var(--borda);
+  background:var(--pagina);color:var(--ink);font-size:1rem;
+}
+.linha{display:flex;gap:8px}
+.linha>*{flex:1;min-width:0}
+button,.btn{
+  display:inline-block;text-align:center;cursor:pointer;border:none;border-radius:8px;
+  padding:11px 14px;font-size:.95rem;font-weight:600;background:var(--azul);color:#fff;
+}
+button.ghost,.btn.ghost{background:transparent;border:1px solid var(--borda);color:var(--ink2)}
+button.perigo{background:var(--critico)}
+button:active{opacity:.8}
+.larga{width:100%;margin-top:12px}
+
+/* nav inferior */
+nav{
+  position:fixed;bottom:0;left:0;right:0;z-index:10;
+  background:var(--card);border-top:1px solid var(--borda);
+  display:flex;max-width:560px;margin:0 auto;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+nav button{
+  flex:1;background:none;border-radius:0;padding:8px 0 10px;
+  color:var(--mudo);font-size:.65rem;font-weight:500;
+}
+nav button span{display:block;font-size:1.25rem;margin-bottom:2px}
+nav button.ativo{color:var(--azul)}
+
+/* chips de sugestão */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{
+  background:var(--pagina);border:1px solid var(--borda);border-radius:999px;
+  padding:8px 12px;font-size:.85rem;color:var(--ink);cursor:pointer;
+}
+.chip b{color:var(--azul)}
+.grupo-sug{margin-bottom:10px}
+.grupo-sug .titulo{font-size:.8rem;color:var(--ink2);margin-bottom:6px}
+
+/* lista de registros */
+ul{list-style:none}
+li.reg{
+  display:flex;align-items:center;gap:10px;padding:10px 0;
+  border-bottom:1px solid var(--borda);
+}
+li.reg:last-child{border-bottom:none}
+li.reg .info{flex:1;min-width:0}
+li.reg .nome{font-weight:600;font-size:.92rem}
+li.reg .det{color:var(--mudo);font-size:.8rem;margin-top:2px}
+.badge-pr{background:var(--atencao);color:#0b0b0b;font-size:.65rem;font-weight:700;border-radius:6px;padding:2px 6px;margin-left:6px;vertical-align:1px}
+.bt-x{background:none;border:none;color:var(--mudo);font-size:1.1rem;padding:6px}
+
+/* músculos */
+.musculo{padding:10px 0;border-bottom:1px solid var(--borda)}
+.musculo:last-child{border-bottom:none}
+.musculo .cab{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
+.musculo .nome{font-weight:600;font-size:.92rem}
+.musculo .estado{font-size:.78rem;font-weight:600}
+.barra{height:8px;border-radius:4px;background:var(--pagina);overflow:hidden}
+.barra>div{height:100%;border-radius:4px}
+.musculo .rodape{font-size:.75rem;color:var(--mudo);margin-top:4px}
+
+/* timer */
+#timer-display{font-size:2.4rem;font-weight:700;text-align:center;padding:6px 0;font-variant-numeric:tabular-nums}
+#timer-display.acabou{color:var(--bom)}
+
+/* stat tiles */
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.tile{background:var(--card);border:1px solid var(--borda);border-radius:12px;padding:10px}
+.tile .valor{font-size:1.3rem;font-weight:700}
+.tile .rotulo{font-size:.7rem;color:var(--mudo);margin-top:2px}
+
+/* gráficos */
+.grafico{position:relative;margin-top:6px}
+.grafico svg{display:block}
+.grafico .tip{
+  position:absolute;pointer-events:none;display:none;z-index:5;
+  background:var(--pagina);border:1px solid var(--borda);border-radius:8px;
+  padding:6px 9px;font-size:.75rem;color:var(--ink);white-space:nowrap;
+  transform:translate(-50%,-115%);
+}
+.grafico .tip .v{font-weight:700}
+.grafico .tip .d{color:var(--mudo)}
+
+/* galeria de máquinas */
+.grid-fotos{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.foto-card{background:var(--card);border:1px solid var(--borda);border-radius:12px;overflow:hidden}
+.foto-card img{width:100%;aspect-ratio:1;object-fit:cover;display:block;cursor:pointer}
+.foto-card .leg{padding:8px}
+.foto-card .leg .ex{font-size:.85rem;font-weight:600}
+.foto-card .leg .nota{font-size:.75rem;color:var(--mudo);margin-top:2px}
+.foto-card .leg button{width:100%;margin-top:8px;padding:6px;font-size:.75rem}
+#preview-foto{width:100%;border-radius:8px;margin-bottom:4px}
+
+/* lightbox */
+#lightbox{
+  position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.92);
+  display:none;align-items:center;justify-content:center;cursor:pointer;
+}
+#lightbox.aberto{display:flex}
+#lightbox img{max-width:100%;max-height:100%}
+
+/* toast */
+#toast{
+  position:fixed;bottom:86px;left:50%;transform:translateX(-50%);z-index:20;
+  background:var(--card);border:1px solid var(--borda);color:var(--ink);
+  padding:10px 16px;border-radius:999px;font-size:.85rem;font-weight:600;
+  opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap;
+}
+#toast.mostrar{opacity:1}
+</style>
+</head>
+<body>
+
+<h1>🏋️ Carga <small>diário de treino</small></h1>
+
+<!-- TREINO -->
+<section id="tab-treino">
+  <div class="card" id="card-sugestoes">
+    <h3>💡 Sugestão para hoje</h3>
+    <div id="sugestoes"></div>
+  </div>
+
+  <div class="card">
+    <h3>Registrar exercício</h3>
+    <label for="sel-exercicio">Exercício</label>
+    <select id="sel-exercicio"></select>
+    <div class="linha">
+      <div><label for="in-peso">Peso (kg, 0 = corporal)</label>
+        <input id="in-peso" type="number" inputmode="decimal" min="0" step="0.5" value="20"></div>
+      <div><label for="in-reps">Repetições</label>
+        <input id="in-reps" type="number" inputmode="numeric" min="1" value="10"></div>
+      <div><label for="in-series">Séries</label>
+        <input id="in-series" type="number" inputmode="numeric" min="1" value="3"></div>
+    </div>
+    <button class="larga" id="bt-add">Adicionar ao treino</button>
+  </div>
+
+  <div class="card">
+    <h3>⏱️ Descanso entre séries</h3>
+    <div id="timer-display">–:––</div>
+    <div class="linha">
+      <button class="ghost" data-timer="30">30s</button>
+      <button class="ghost" data-timer="60">60s</button>
+      <button class="ghost" data-timer="90">90s</button>
+      <button class="ghost" data-timer="120">2min</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Registrado hoje <span id="hoje-data" class="mudo"></span></h3>
+    <ul id="log-hoje"></ul>
+    <div id="gasto-hoje"></div>
+  </div>
+</section>
+
+<!-- MÚSCULOS -->
+<section id="tab-musculos" hidden>
+  <div class="card">
+    <h3>💪 Recuperação muscular</h3>
+    <p class="mudo" style="margin-bottom:8px">Estimativa baseada no volume, intensidade relativa e no seu perfil (ajuste em ⚙️). Barra cheia = pronto para treinar.</p>
+    <div id="musculos-grid"></div>
+  </div>
+</section>
+
+<!-- PROGRESSO -->
+<section id="tab-progresso" hidden>
+  <div class="tiles" id="tiles-gerais"></div>
+  <div class="card">
+    <h3>📈 Progressão por exercício</h3>
+    <select id="sel-progresso"></select>
+    <div class="tiles" id="tiles-ex" style="margin-top:12px"></div>
+    <h3 style="margin-top:6px">Força estimada (e1RM, kg)</h3>
+    <div class="grafico" id="graf-e1rm"></div>
+    <h3 style="margin-top:14px">Volume por treino (kg)</h3>
+    <div class="grafico" id="graf-volume"></div>
+  </div>
+</section>
+
+<!-- MÁQUINAS -->
+<section id="tab-maquinas" hidden>
+  <div class="card">
+    <h3>📷 Catálogo de máquinas</h3>
+    <p class="mudo" style="margin-bottom:10px">Fotografe as máquinas da sua academia e vincule ao exercício — nunca mais esqueça qual é qual nem o ajuste do banco.</p>
+    <label class="btn larga" style="margin-top:0">
+      📷 Fotografar máquina
+      <input type="file" accept="image/*" capture="environment" id="input-foto" hidden>
+    </label>
+  </div>
+  <div class="card" id="form-foto" hidden>
+    <h3>Nova máquina</h3>
+    <img id="preview-foto" alt="Pré-visualização da máquina">
+    <label for="foto-exercicio">Exercício correspondente</label>
+    <select id="foto-exercicio"></select>
+    <label for="foto-nota">Anotação (ajustes, dicas…)</label>
+    <input id="foto-nota" type="text" placeholder="ex.: banco no nível 4, pegada média">
+    <div class="linha" style="margin-top:12px">
+      <button id="bt-salvar-foto">Salvar</button>
+      <button class="ghost" id="bt-cancelar-foto">Cancelar</button>
+    </div>
+  </div>
+  <div class="grid-fotos" id="galeria"></div>
+</section>
+
+<!-- AJUSTES -->
+<section id="tab-ajustes" hidden>
+  <div class="card">
+    <h3>⚙️ Seu perfil de recuperação</h3>
+    <label for="aj-exp">Nível de experiência</label>
+    <select id="aj-exp">
+      <option value="iniciante">Iniciante (recupera mais devagar do dano)</option>
+      <option value="intermediario">Intermediário</option>
+      <option value="avancado">Avançado (recupera mais rápido)</option>
+    </select>
+    <label for="aj-sono">Qualidade do sono ultimamente</label>
+    <select id="aj-sono">
+      <option value="ruim">Ruim (&lt; 6h)</option>
+      <option value="media">Média (6–7h)</option>
+      <option value="boa">Boa (7h+)</option>
+    </select>
+    <label for="aj-fator">Ajuste fino — sinto que recupero: <span id="aj-fator-txt"></span></label>
+    <input id="aj-fator" type="range" min="0.7" max="1.3" step="0.05">
+  </div>
+  <div class="card">
+    <h3>💾 Backup</h3>
+    <p class="mudo" style="margin-bottom:10px">Exporta treinos e perfil em JSON (fotos ficam só no aparelho).</p>
+    <div class="linha">
+      <button id="bt-exportar">Exportar</button>
+      <label class="btn ghost" style="flex:1">Importar
+        <input type="file" accept="application/json" id="input-importar" hidden>
+      </label>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Zona de perigo</h3>
+    <button class="perigo larga" style="margin-top:0" id="bt-apagar">Apagar todos os dados</button>
+  </div>
+</section>
+
+<nav>
+  <button data-tab="treino" class="ativo"><span>🏋️</span>Treino</button>
+  <button data-tab="musculos"><span>💪</span>Músculos</button>
+  <button data-tab="progresso"><span>📈</span>Progresso</button>
+  <button data-tab="maquinas"><span>📷</span>Máquinas</button>
+  <button data-tab="ajustes"><span>⚙️</span>Ajustes</button>
+</nav>
+
+<div id="toast"></div>
+<div id="lightbox"><img alt="Foto da máquina"></div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
