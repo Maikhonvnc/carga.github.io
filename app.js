@@ -75,26 +75,52 @@ function ultimoTreino(muscId) {
 }
 
 // ---------- sugestão de treino ----------
+const GASTO_ALVO = 5; // estímulo diário a partir do qual o músculo conta como "finalizado" (= nível "pesado")
+const nivelSti = s => s < 2 ? 'leve' : s < 5 ? 'moderado' : 'pesado';
+
 function sugerirTreino() {
   const hoje = dayKey(Date.now());
-  const treinadosHoje = new Set();
-  logs.filter(l => dayKey(l.ts) === hoje).forEach(l =>
-    Object.entries((exMap[l.ex] || { musculos: {} }).musculos).forEach(([m, f]) => { if (f >= 0.3) treinadosHoje.add(m); }));
+  const logsHoje = logs.filter(l => dayKey(l.ts) === hoje);
+  const stiHoje = {};
+  MUSCULOS.forEach(m => { stiHoje[m.id] = logsHoje.reduce((s, l) => s + estimulo(l, m.id), 0); });
+  const estados = MUSCULOS.map(m => ({ m, pct: pctRecuperado(m.id), ultimo: ultimoTreino(m.id), sti: stiHoje[m.id] }));
+  const emRecuperacao = estados.filter(x => x.pct < 60 && x.sti < 0.5); // fatigado de dias anteriores
+  const feitosHoje = new Set(logsHoje.map(l => l.ex));
 
-  const estados = MUSCULOS.map(m => ({ m, pct: pctRecuperado(m.id), ultimo: ultimoTreino(m.id) }));
-  const prontos = estados
-    .filter(x => x.pct >= 85 && !treinadosHoje.has(x.m.id))
-    .sort((a, b) => (a.ultimo || 0) - (b.ultimo || 0));
-  const emRecuperacao = estados.filter(x => x.pct < 60);
+  const escolheExs = mId => {
+    const alvo = EXERCICIOS.filter(e => (e.musculos[mId] || 0) >= 0.5 && !feitosHoje.has(e.id));
+    const conhecidos = alvo.filter(e => logs.some(l => l.ex === e.id));
+    return [...conhecidos, ...alvo.filter(e => !conhecidos.includes(e))].slice(0, 2);
+  };
 
-  const grupos = prontos.slice(0, 4).map(x => {
-    const alvo = EXERCICIOS.filter(e => (e.musculos[x.m.id] || 0) >= 0.5);
-    const feitos = alvo.filter(e => logs.some(l => l.ex === e.id));
-    const exs = [...feitos, ...alvo.filter(e => !feitos.includes(e))].slice(0, 2);
-    return { m: x.m, exs };
-  }).filter(g => g.exs.length);
+  // sessão em andamento: detecta a região pelo estímulo do dia e sugere o que falta finalizar nela
+  let regiao = null, grupos = [], completa = false;
+  if (logsHoje.length) {
+    const top = REGIOES.map(r => ({ r, score: r.musculos.reduce((s, m) => s + stiHoje[m], 0) }))
+      .sort((a, b) => b.score - a.score)[0];
+    if (top.score > 0) {
+      regiao = top.r;
+      grupos = estados
+        .filter(x => regiao.musculos.includes(x.m.id) && x.sti < GASTO_ALVO && !emRecuperacao.includes(x))
+        .sort((a, b) => a.sti - b.sti || b.pct - a.pct)
+        .map(x => ({ m: x.m, sti: x.sti, exs: escolheExs(x.m.id) }))
+        .filter(g => g.exs.length)
+        .slice(0, 4);
+      completa = !grupos.length;
+    }
+  }
 
-  return { grupos, emRecuperacao };
+  // sem treino hoje (ou região finalizada): sugere pelos mais descansados/parados há mais tempo
+  if (!grupos.length) {
+    grupos = estados
+      .filter(x => x.pct >= 85 && x.sti < 0.5)
+      .sort((a, b) => (a.ultimo || 0) - (b.ultimo || 0))
+      .slice(0, 4)
+      .map(x => ({ m: x.m, exs: escolheExs(x.m.id) }))
+      .filter(g => g.exs.length);
+  }
+
+  return { grupos, emRecuperacao, regiao, completa };
 }
 
 // ---------- navegação ----------
@@ -104,6 +130,7 @@ function mostrarTab(nome) {
   $('tab-' + nome).hidden = false;
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('ativo', b.dataset.tab === nome));
   TABS[nome]();
+  if (nome !== 'treino') { cancelAnimationFrame(animRAF); clearInterval(animInterval); }
 }
 
 // ---------- aba Treino ----------
@@ -111,6 +138,7 @@ function renderTreino() {
   $('hoje-data').textContent = '— ' + new Date().toLocaleDateString('pt-BR');
   renderSugestoes();
   renderLogHoje();
+  mostraAnim($('sel-exercicio').value);
 }
 
 function renderSugestoes() {
@@ -119,13 +147,19 @@ function renderSugestoes() {
     el.innerHTML = '<p class="mudo">Sem histórico ainda — registre seu primeiro exercício abaixo e as sugestões aparecem aqui.</p>';
     return;
   }
-  const { grupos, emRecuperacao } = sugerirTreino();
+  const { grupos, emRecuperacao, regiao, completa } = sugerirTreino();
   let html = '';
+  if (regiao && !completa) {
+    html += `<p class="ink2" style="margin-bottom:8px">🎯 Treino de hoje: <b>${esc(regiao.nome)}</b> — falta finalizar:</p>`;
+  } else if (regiao && completa) {
+    html += `<p class="ink2" style="margin-bottom:8px">✅ <b>${esc(regiao.nome)}</b> finalizado! Se quiser continuar, opções descansadas:</p>`;
+  }
   if (!grupos.length) {
     html += '<p class="mudo">Todos os grupos já foram treinados hoje ou estão em recuperação — descanso também é treino 😴</p>';
   }
   for (const g of grupos) {
-    html += `<div class="grupo-sug"><div class="titulo">${esc(g.m.nome)}${g.ultimo === 0 ? '' : ''}</div><div class="chips">`
+    const gasto = g.sti > 0.2 ? ` · já ${nivelSti(g.sti)}` : '';
+    html += `<div class="grupo-sug"><div class="titulo">${esc(g.m.nome)}${gasto}</div><div class="chips">`
       + g.exs.map(e => `<button class="chip" data-ex="${e.id}"><b>+</b> ${esc(e.nome)}</button>`).join('')
       + '</div></div>';
   }
@@ -135,6 +169,7 @@ function renderSugestoes() {
   el.innerHTML = html;
   el.querySelectorAll('.chip').forEach(c => c.onclick = () => {
     $('sel-exercicio').value = c.dataset.ex;
+    mostraAnim(c.dataset.ex);
     $('in-peso').focus();
     $('in-peso').scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
@@ -175,11 +210,91 @@ function renderLogHoje() {
   }));
   const linhas = Object.entries(porMusc).sort((a, b) => b[1] - a[1]).map(([mId, s]) => {
     const pctBar = Math.min(100, Math.round(s * 12));
-    const nivel = s < 2 ? 'leve' : s < 5 ? 'moderado' : 'pesado';
+    const nivel = nivelSti(s);
     return `<div class="musculo"><div class="cab"><span class="nome">${esc(muscMap[mId].nome)}</span><span class="estado ink2">${nivel}</span></div>
       <div class="barra"><div style="width:${pctBar}%;background:var(--azul)"></div></div></div>`;
   }).join('');
   $('gasto-hoje').innerHTML = `<h3 style="margin-top:14px">Gasto por músculo hoje</h3>${linhas}`;
+}
+
+// ---------- animação ilustrativa do exercício ----------
+// ponytail: boneco palito com 2 poses interpoladas cobre os 48 exercícios com ~23 padrões;
+// GIFs reais = licença + megabytes + quebra o offline. Trocar por vídeo/GIF se um dia fizer sentido.
+let animRAF = null, animInterval = null, animToken = 0;
+function mostraAnim(exId) {
+  cancelAnimationFrame(animRAF);
+  clearInterval(animInterval);
+  const box = $('anim-ex');
+  if (!exId || !exMap[exId]) { box.hidden = true; return; }
+  // tenta as fotos reais (imgs/<id>_0.jpg + _1.jpg); sem elas, cai no boneco palito
+  const token = ++animToken;
+  const teste = new Image();
+  teste.onload = () => { if (token === animToken) montaFotos(exId); };
+  teste.onerror = () => { if (token === animToken) montaBoneco(exId); };
+  teste.src = `imgs/${exId}_0.jpg`;
+}
+
+// dois quadros alternados = efeito GIF (fotos do dataset aberto free-exercise-db)
+function montaFotos(exId) {
+  const box = $('anim-ex');
+  box.hidden = false;
+  box.innerHTML = `<img src="imgs/${exId}_0.jpg" alt=""><span>${esc(exMap[exId].nome)}</span>`;
+  const img = box.querySelector('img');
+  img.onclick = () => {
+    $('lightbox').querySelector('img').src = img.src;
+    $('lightbox').classList.add('aberto');
+  };
+  new Image().src = `imgs/${exId}_1.jpg`; // pré-carrega o 2º quadro
+  let quadro = 0;
+  animInterval = setInterval(() => { quadro = 1 - quadro; img.src = `imgs/${exId}_${quadro}.jpg`; }, 700);
+}
+
+function montaBoneco(exId) {
+  const box = $('anim-ex');
+  const an = ANIMS[EX_ANIM[exId]];
+  if (!an) { box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = `<svg viewBox="0 0 100 100" width="92" height="92"></svg><span>${esc(exMap[exId].nome)}</span>`;
+  const svg = box.querySelector('svg');
+  const NS = 'http://www.w3.org/2000/svg';
+  // cenário estático
+  let fundo = '';
+  if (an.chao) fundo += `<line x1="12" y1="${an.chao}" x2="88" y2="${an.chao}" stroke="#4d4d46" stroke-width="2" stroke-linecap="round"/>`;
+  if (an.topo) fundo += `<line x1="30" y1="10" x2="70" y2="10" stroke="#4d4d46" stroke-width="3" stroke-linecap="round"/>`;
+  if (an.banco) fundo += `<rect x="${an.banco[0]}" y="${an.banco[1]}" width="${an.banco[2]}" height="${an.banco[3]}" rx="2" fill="#4d4d46"/>`;
+  if (an.linha) fundo += `<line x1="${an.linha[0]}" y1="${an.linha[1]}" x2="${an.linha[2]}" y2="${an.linha[3]}" stroke="#4d4d46" stroke-width="3" stroke-linecap="round"/>`;
+  svg.innerHTML = fundo;
+  const el = (tag, attrs) => {
+    const n = document.createElementNS(NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    svg.appendChild(n);
+    return n;
+  };
+  const cabo = an.ancora ? el('line', { stroke: 'var(--grade)', 'stroke-width': 1.5 }) : null;
+  const segs = [['om', 'qu'], ['ca', 'om'], ['om', 'co'], ['co', 'ma'], ['qu', 'jo'], ['jo', 'pe']]
+    .map(par => ({ par, el: el('line', { stroke: 'var(--ink2)', 'stroke-width': 4.5, 'stroke-linecap': 'round' }) }));
+  const cabeca = el('circle', { r: 5.5, fill: 'var(--ink2)' });
+  const peso = an.peso ? el('circle', { r: 4.5, fill: 'var(--pagina)', stroke: 'var(--azul)', 'stroke-width': 2.5 }) : null;
+
+  const t0 = performance.now();
+  const passo = agora => {
+    const t = (Math.sin((agora - t0) / 1400 * 2 * Math.PI - Math.PI / 2) + 1) / 2; // vai-e-vem suave
+    const P = {};
+    for (const j in an.A) P[j] = [an.A[j][0] + (an.B[j][0] - an.A[j][0]) * t, an.A[j][1] + (an.B[j][1] - an.A[j][1]) * t];
+    for (const { par: [a, b], el: l } of segs) {
+      l.setAttribute('x1', P[a][0]); l.setAttribute('y1', P[a][1]);
+      l.setAttribute('x2', P[b][0]); l.setAttribute('y2', P[b][1]);
+    }
+    cabeca.setAttribute('cx', P.ca[0]); cabeca.setAttribute('cy', P.ca[1]);
+    const pp = P[an.pesoEm || 'ma'];
+    if (peso) { peso.setAttribute('cx', pp[0]); peso.setAttribute('cy', pp[1]); }
+    if (cabo) {
+      cabo.setAttribute('x1', an.ancora[0]); cabo.setAttribute('y1', an.ancora[1]);
+      cabo.setAttribute('x2', P.ma[0]); cabo.setAttribute('y2', P.ma[1]);
+    }
+    animRAF = requestAnimationFrame(passo);
+  };
+  animRAF = requestAnimationFrame(passo);
 }
 
 function adicionarLog() {
@@ -198,10 +313,46 @@ function adicionarLog() {
 }
 
 // ---------- aba Músculos ----------
+// mapa corporal 2D: fadiga (100 − % recuperado) vira intensidade de vermelho — rampa sequencial de um matiz
+function corpoSvg(recup) {
+  const cor = m => {
+    if (!m) return '#262624'; // partes não rastreadas (cabeça, mãos…)
+    const t = Math.min(1, (100 - recup[m]) / 100 * 1.15);
+    const c = (a, b) => Math.round(a + (b - a) * t);
+    return `rgb(${c(51, 208)},${c(51, 59)},${c(47, 59)})`; // #33332f → #d03b3b
+  };
+  const espelha = ([tag, at]) => {
+    const a = { ...at };
+    if (tag === 'ellipse') a.cx = 200 - a.cx;
+    else if (tag === 'rect') a.x = 200 - a.x - a.width;
+    else a.d = a.d.replace(/(-?[\d.]+),(-?[\d.]+)/g, (s, x, y) => `${200 - parseFloat(x)},${y}`);
+    return [tag, a];
+  };
+  const el = ([tag, at], m) => {
+    const attrs = Object.entries(at).map(([k, v]) => `${k}="${v}"`).join(' ');
+    const titulo = m ? `<title>${esc(muscMap[m].nome)} — ${recup[m]}% recuperado</title>` : '';
+    return `<${tag} ${attrs} fill="${cor(m)}" stroke="var(--card)" stroke-width="1.5">${titulo}</${tag}>`;
+  };
+  let g = '';
+  for (const [vista, dx, rotulo] of [['f', 0, 'Frente'], ['c', 200, 'Costas']]) {
+    g += `<g transform="translate(${dx},0)">`;
+    for (const p of CORPO_SVG[vista]) {
+      g += el(p.forma, p.m);
+      if (p.esp) g += el(espelha(p.forma), p.m);
+    }
+    g += `<text x="100" y="326" text-anchor="middle" fill="var(--mudo)" font-size="11">${rotulo}</text></g>`;
+  }
+  return `<svg viewBox="0 0 400 332" style="width:100%;max-width:340px;display:block;margin:0 auto">${g}</svg>`;
+}
+
 function renderMusculos() {
+  const recup = {};
+  MUSCULOS.forEach(m => { recup[m.id] = pctRecuperado(m.id); });
+  $('mapa-corpo').innerHTML = corpoSvg(recup) +
+    '<div class="escala"><span>descansado</span><div></div><span>fatigado</span></div>';
   const el = $('musculos-grid');
   el.innerHTML = MUSCULOS.map(m => {
-    const pct = pctRecuperado(m.id);
+    const pct = recup[m.id];
     const ultimo = ultimoTreino(m.id);
     const cor = pct >= 85 ? 'var(--bom)' : pct >= 60 ? 'var(--atencao)' : pct >= 35 ? 'var(--serio)' : 'var(--critico)';
     const estado = pct >= 85 ? '✅ Pronto' : `⏳ ~${horasAtePronto(m.id)}h p/ 90%`;
@@ -514,6 +665,7 @@ function popularSelects() {
 popularSelects();
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => mostrarTab(b.dataset.tab));
 $('bt-add').onclick = adicionarLog;
+$('sel-exercicio').onchange = e => mostraAnim(e.target.value);
 document.querySelectorAll('[data-timer]').forEach(b => b.onclick = () => iniciarTimer(parseInt(b.dataset.timer, 10)));
 $('sel-progresso').onchange = renderProgresso;
 $('input-foto').onchange = e => prepararFoto(e.target);

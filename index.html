@@ -92,6 +92,14 @@ li.reg .det{color:var(--mudo);font-size:.8rem;margin-top:2px}
 .barra{height:8px;border-radius:4px;background:var(--pagina);overflow:hidden}
 .barra>div{height:100%;border-radius:4px}
 .musculo .rodape{font-size:.75rem;color:var(--mudo);margin-top:4px}
+.escala{display:flex;align-items:center;gap:8px;justify-content:center;margin:6px 0 12px;font-size:.7rem;color:var(--mudo)}
+.escala div{width:90px;height:8px;border-radius:4px;background:linear-gradient(90deg,#33332f,#d03b3b)}
+
+/* animação ilustrativa do exercício */
+#anim-ex{display:flex;align-items:center;gap:12px;background:var(--pagina);border:1px solid var(--borda);border-radius:8px;margin-top:8px;padding:6px 10px}
+#anim-ex[hidden]{display:none}
+#anim-ex span{font-size:.85rem;color:var(--ink2)}
+#anim-ex img{width:112px;height:75px;object-fit:cover;border-radius:8px;background:#fff}
 
 /* timer */
 #timer-display{font-size:2.4rem;font-weight:700;text-align:center;padding:6px 0;font-variant-numeric:tabular-nums}
@@ -158,6 +166,7 @@ li.reg .det{color:var(--mudo);font-size:.8rem;margin-top:2px}
     <h3>Registrar exercício</h3>
     <label for="sel-exercicio">Exercício</label>
     <select id="sel-exercicio"></select>
+    <div id="anim-ex" hidden></div>
     <div class="linha">
       <div><label for="in-peso">Peso (kg, 0 = corporal)</label>
         <input id="in-peso" type="number" inputmode="decimal" min="0" step="0.5" value="20"></div>
@@ -191,7 +200,8 @@ li.reg .det{color:var(--mudo);font-size:.8rem;margin-top:2px}
 <section id="tab-musculos" hidden>
   <div class="card">
     <h3>💪 Recuperação muscular</h3>
-    <p class="mudo" style="margin-bottom:8px">Estimativa baseada no volume, intensidade relativa e no seu perfil (ajuste em ⚙️). Barra cheia = pronto para treinar.</p>
+    <p class="mudo" style="margin-bottom:8px">Estimativa baseada no volume, intensidade relativa e no seu perfil (ajuste em ⚙️). Quanto mais vermelho, mais fatigado.</p>
+    <div id="mapa-corpo"></div>
     <div id="musculos-grid"></div>
   </div>
 </section>
