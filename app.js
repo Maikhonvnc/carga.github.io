@@ -2,16 +2,24 @@
 'use strict';
 
 // ---------- estado ----------
-const LS_LOGS = 'carga.logs', LS_PERFIL = 'carga.perfil';
+const LS_LOGS = 'carga.logs', LS_PERFIL = 'carga.perfil', LS_ROTINAS = 'carga.rotinas',
+  LS_CUSTOM = 'carga.exercicios', LS_OVER = 'carga.overrides', LS_TIMER = 'carga.timer';
 const PERFIL_PADRAO = { experiencia: 'intermediario', sono: 'media', fator: 1 };
 let logs = JSON.parse(localStorage.getItem(LS_LOGS) || '[]');
 let perfil = Object.assign({}, PERFIL_PADRAO, JSON.parse(localStorage.getItem(LS_PERFIL) || '{}'));
+let rotinas = JSON.parse(localStorage.getItem(LS_ROTINAS) || '[]');
+let overrides = JSON.parse(localStorage.getItem(LS_OVER) || '{}'); // feedback do usuário sobre recuperação
+let customExs = JSON.parse(localStorage.getItem(LS_CUSTOM) || '[]');
+customExs.forEach(e => EXERCICIOS.push(e));
 
 const $ = id => document.getElementById(id);
 const exMap = Object.fromEntries(EXERCICIOS.map(e => [e.id, e]));
 const muscMap = Object.fromEntries(MUSCULOS.map(m => [m.id, m]));
 const salvarLogs = () => localStorage.setItem(LS_LOGS, JSON.stringify(logs));
 const salvarPerfil = () => localStorage.setItem(LS_PERFIL, JSON.stringify(perfil));
+const salvarRotinas = () => localStorage.setItem(LS_ROTINAS, JSON.stringify(rotinas));
+const salvarOverrides = () => localStorage.setItem(LS_OVER, JSON.stringify(overrides));
+const salvarCustom = () => localStorage.setItem(LS_CUSTOM, JSON.stringify(customExs));
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 function dayKey(ts) {
@@ -46,14 +54,20 @@ const estimulo = (l, muscId) => {
 };
 
 function fadigaEm(muscId, t) {
+  const ov = overrides[muscId];
   let fat = 0;
   for (const l of logs) {
+    if (ov && ov.tipo === 'pronto' && l.ts <= ov.ts) continue; // usuário declarou-se recuperado: zera fadiga anterior
     const horas = (t - l.ts) / 3.6e6;
     if (horas < 0 || horas > 240) continue;
     const sti = estimulo(l, muscId);
     if (!sti) continue;
     const precisa = Math.min(96, 24 + sti * 6) * FATOR_EXP[perfil.experiencia] * FATOR_SONO[perfil.sono] * perfil.fator;
     fat += sti * Math.max(0, 1 - horas / precisa);
+  }
+  if (ov && ov.tipo === 'mais') {
+    const h = (t - ov.ts) / 3.6e6;
+    if (h >= 0 && h < 24) fat += 2 * (1 - h / 24); // usuário pediu mais tempo: ~-24 pts decaindo ao longo de 24h
   }
   return fat;
 }
@@ -137,6 +151,7 @@ function mostrarTab(nome) {
 function renderTreino() {
   $('hoje-data').textContent = '— ' + new Date().toLocaleDateString('pt-BR');
   renderSugestoes();
+  renderRotinas();
   renderLogHoje();
   mostraAnim($('sel-exercicio').value);
 }
@@ -167,12 +182,7 @@ function renderSugestoes() {
     html += `<p class="mudo" style="margin-top:6px">🔻 Em recuperação (evite hoje): ${emRecuperacao.map(x => `${esc(x.m.nome)} (${x.pct}%)`).join(', ')}</p>`;
   }
   el.innerHTML = html;
-  el.querySelectorAll('.chip').forEach(c => c.onclick = () => {
-    $('sel-exercicio').value = c.dataset.ex;
-    mostraAnim(c.dataset.ex);
-    $('in-peso').focus();
-    $('in-peso').scrollIntoView({ behavior: 'smooth', block: 'center' });
-  });
+  bindChips(el);
 }
 
 function renderLogHoje() {
@@ -193,8 +203,32 @@ function renderLogHoje() {
     li.innerHTML =
       `<div class="info"><div class="nome">${esc(ex ? ex.nome : l.ex)}${l.pr ? '<span class="badge-pr">PR 🏆</span>' : ''}</div>
        <div class="det">${l.peso} kg × ${l.reps} reps × ${l.series} séries${vol ? ` · volume ${kg(vol)} kg` : ''}${e1rm(l.peso, l.reps) ? ` · e1RM ~${kg(e1rm(l.peso, l.reps))} kg` : ''}</div></div>
+       <button class="bt-mais" aria-label="Adicionar uma série">+1</button>
+       <button class="bt-x bt-e" aria-label="Editar registro">✎</button>
        <button class="bt-x" aria-label="Excluir registro">✕</button>`;
-    li.querySelector('.bt-x').onclick = () => {
+    li.querySelector('.bt-mais').onclick = () => {
+      l.series += 1;
+      salvarLogs();
+      renderTreino();
+      iniciarTimer(parseInt(localStorage.getItem(LS_TIMER), 10) || 90);
+      toast(`${l.series}ª série anotada — descansa! ⏱️`);
+    };
+    li.querySelector('.bt-e').onclick = () => {
+      const det = li.querySelector('.det');
+      det.innerHTML = `<input type="number" inputmode="decimal" step="0.5" min="0" value="${l.peso}"> kg ×
+        <input type="number" inputmode="numeric" min="1" value="${l.reps}"> ×
+        <input type="number" inputmode="numeric" min="1" value="${l.series}"> séries
+        <button class="bt-ok">✓</button>`;
+      const [iP, iR, iS] = det.querySelectorAll('input');
+      det.querySelector('.bt-ok').onclick = () => {
+        const p = parseFloat(iP.value), r = parseInt(iR.value, 10), s = parseInt(iS.value, 10);
+        if (isNaN(p) || p < 0 || !r || r < 1 || !s || s < 1) return toast('Confira os valores.');
+        l.peso = p; l.reps = r; l.series = s;
+        salvarLogs();
+        renderTreino();
+      };
+    };
+    li.querySelector('.bt-x:not(.bt-e)').onclick = () => {
       if (!confirm('Excluir este registro?')) return;
       logs = logs.filter(x => x.id !== l.id);
       salvarLogs();
@@ -215,6 +249,75 @@ function renderLogHoje() {
       <div class="barra"><div style="width:${pctBar}%;background:var(--azul)"></div></div></div>`;
   }).join('');
   $('gasto-hoje').innerHTML = `<h3 style="margin-top:14px">Gasto por músculo hoje</h3>${linhas}`;
+}
+
+// ---------- dica de progressão (progressão dupla: sobe reps até o teto, depois sobe carga) ----------
+function dicaCarga(exId) {
+  const doEx = logs.filter(l => l.ex === exId);
+  if (!doEx.length) return null;
+  const dia = dayKey(Math.max(...doEx.map(l => l.ts)));
+  const sessao = doEx.filter(l => dayKey(l.ts) === dia);
+  const melhor = sessao.reduce((m, l) =>
+    e1rm(l.peso, l.reps) > e1rm(m.peso, m.reps) || (m.peso === 0 && l.reps > m.reps) ? l : m);
+  let alvoPeso = melhor.peso, alvoReps = melhor.reps + 1;
+  if (melhor.peso > 0 && melhor.reps >= 12) { alvoPeso = melhor.peso + 2.5; alvoReps = 8; }
+  return { u: melhor, alvoPeso, alvoReps };
+}
+
+function selecionaExercicio(exId) {
+  mostraAnim(exId);
+  const el = $('dica-carga');
+  const d = exId ? dicaCarga(exId) : null;
+  if (!d) { el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = `Última vez (${dataBr(d.u.ts)}): <b>${d.u.peso} kg × ${d.u.reps} × ${d.u.series}</b> — alvo de hoje: <span class="alvo">${d.alvoPeso} kg × ${d.alvoReps}</span>`;
+  $('in-peso').value = d.alvoPeso;
+  $('in-reps').value = d.alvoReps;
+  $('in-series').value = d.u.series;
+}
+
+function bindChips(cont) {
+  cont.querySelectorAll('.chip').forEach(c => c.onclick = () => {
+    $('sel-exercicio').value = c.dataset.ex;
+    selecionaExercicio(c.dataset.ex);
+    $('in-peso').focus();
+    $('in-peso').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+}
+
+// ---------- rotinas ----------
+function renderRotinas() {
+  const el = $('rotinas-lista');
+  if (!rotinas.length) {
+    el.innerHTML = '<p class="mudo">Nenhuma rotina salva — registre um treino e salve como rotina para repetir com um toque.</p>';
+    return;
+  }
+  const hoje = dayKey(Date.now());
+  const feitos = new Set(logs.filter(l => dayKey(l.ts) === hoje).map(l => l.ex));
+  el.innerHTML = rotinas.map(r =>
+    `<div class="grupo-sug"><div class="titulo">${esc(r.nome)}<button class="x-rot" data-rot="${r.id}" aria-label="Excluir rotina">✕</button></div><div class="chips">`
+    + r.itens.filter(id => exMap[id]).map(id =>
+      `<button class="chip${feitos.has(id) ? ' feito' : ''}" data-ex="${id}">${feitos.has(id) ? '✓' : '<b>+</b>'} ${esc(exMap[id].nome)}</button>`).join('')
+    + '</div></div>').join('');
+  bindChips(el);
+  el.querySelectorAll('.x-rot').forEach(b => b.onclick = () => {
+    if (!confirm('Excluir esta rotina?')) return;
+    rotinas = rotinas.filter(r => String(r.id) !== b.dataset.rot);
+    salvarRotinas();
+    renderRotinas();
+  });
+}
+
+function salvarRotinaDeHoje() {
+  const hoje = dayKey(Date.now());
+  const itens = [...new Set(logs.filter(l => dayKey(l.ts) === hoje).map(l => l.ex))];
+  if (!itens.length) return toast('Registre o treino de hoje primeiro.');
+  const nome = prompt('Nome da rotina (ex.: Empurrar A):');
+  if (!nome || !nome.trim()) return;
+  rotinas.push({ id: Date.now(), nome: nome.trim(), itens });
+  salvarRotinas();
+  toast('Rotina salva 📋');
+  renderRotinas();
 }
 
 // ---------- animação ilustrativa do exercício ----------
@@ -360,8 +463,25 @@ function renderMusculos() {
       <div class="cab"><span class="nome">${esc(m.nome)}</span><span class="estado" style="color:${cor}">${estado} · ${pct}%</span></div>
       <div class="barra"><div style="width:${pct}%;background:${cor}"></div></div>
       <div class="rodape">${ultimo ? 'último treino: ' + dataBr(ultimo) : 'nunca treinado'}</div>
+      <div class="fb">
+        ${pct < 90 ? `<button data-fb="pronto" data-m="${m.id}">💪 Já recuperei</button>` : ''}
+        ${pct >= 60 ? `<button data-fb="mais" data-m="${m.id}">😮‍💨 Preciso de mais tempo</button>` : ''}
+      </div>
     </div>`;
   }).join('');
+  el.querySelectorAll('[data-fb]').forEach(b => b.onclick = () => feedbackMusculo(b.dataset.m, b.dataset.fb));
+}
+
+// feedback do usuário corrige a exibição agora E calibra o fator de recuperação do perfil
+function feedbackMusculo(mId, tipo) {
+  overrides[mId] = { tipo, ts: Date.now() };
+  perfil.fator = tipo === 'pronto'
+    ? Math.max(0.7, +(perfil.fator * 0.95).toFixed(2))
+    : Math.min(1.3, +(perfil.fator * 1.05).toFixed(2));
+  salvarPerfil();
+  salvarOverrides();
+  toast(tipo === 'pronto' ? 'Anotado! Modelo ajustado: você recupera mais rápido 💪' : 'Ok, dando mais tempo pra esse músculo 😮‍💨');
+  renderMusculos();
 }
 
 // ---------- aba Progresso ----------
@@ -560,6 +680,43 @@ function renderAjustes() {
   $('aj-sono').value = perfil.sono;
   $('aj-fator').value = perfil.fator;
   atualizaFatorTxt();
+  renderPexLista();
+}
+
+// ---------- exercícios personalizados ----------
+function aplicaCustom() { // sincroniza customExs → EXERCICIOS/exMap/selects
+  salvarCustom();
+  for (let i = EXERCICIOS.length - 1; i >= 0; i--) {
+    if (String(EXERCICIOS[i].id).startsWith('custom_')) { delete exMap[EXERCICIOS[i].id]; EXERCICIOS.splice(i, 1); }
+  }
+  customExs.forEach(e => { EXERCICIOS.push(e); exMap[e.id] = e; });
+  popularSelects();
+}
+
+function adicionarExPersonalizado() {
+  const nome = $('pex-nome').value.trim();
+  const m1 = $('pex-m1').value, m2 = $('pex-m2').value;
+  if (!nome) return toast('Dê um nome ao exercício.');
+  const musculos = m2 && m2 !== m1 ? { [m1]: 0.7, [m2]: 0.3 } : { [m1]: 1 };
+  customExs.push({ id: 'custom_' + Date.now(), cat: 'Personalizados', nome, musculos });
+  aplicaCustom();
+  $('pex-nome').value = '';
+  toast('Exercício adicionado ➕');
+  renderPexLista();
+}
+
+function renderPexLista() {
+  const el = $('pex-lista');
+  el.innerHTML = customExs.map(e =>
+    `<div class="musculo"><div class="cab"><span class="nome">${esc(e.nome)}</span>
+      <button class="x-rot" data-pex="${e.id}" aria-label="Excluir exercício">✕</button></div>
+      <div class="rodape">${Object.keys(e.musculos).map(m => muscMap[m] ? muscMap[m].nome : m).join(' + ')}</div></div>`).join('');
+  el.querySelectorAll('[data-pex]').forEach(b => b.onclick = () => {
+    if (!confirm('Excluir este exercício? Registros antigos dele continuam no histórico.')) return;
+    customExs = customExs.filter(e => e.id !== b.dataset.pex);
+    aplicaCustom();
+    renderPexLista();
+  });
 }
 function atualizaFatorTxt() {
   const v = parseFloat($('aj-fator').value);
@@ -567,7 +724,7 @@ function atualizaFatorTxt() {
 }
 
 function exportar() {
-  const blob = new Blob([JSON.stringify({ versao: 1, perfil, logs })], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify({ versao: 2, perfil, logs, rotinas, overrides, exercicios: customExs })], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `carga-backup-${dayKey(Date.now())}.json`;
@@ -585,7 +742,11 @@ async function importar(input) {
     if (!confirm(`Substituir os dados atuais por ${d.logs.length} registros do backup?`)) return;
     logs = d.logs;
     perfil = Object.assign({}, PERFIL_PADRAO, d.perfil);
-    salvarLogs(); salvarPerfil();
+    rotinas = d.rotinas || [];
+    overrides = d.overrides || {};
+    customExs = d.exercicios || [];
+    salvarLogs(); salvarPerfil(); salvarRotinas(); salvarOverrides();
+    aplicaCustom();
     toast('Backup restaurado ✔');
     mostrarTab('treino');
   } catch {
@@ -598,8 +759,11 @@ async function apagarTudo() {
   if (!confirm('Certeza mesmo?')) return;
   logs = [];
   perfil = Object.assign({}, PERFIL_PADRAO);
-  localStorage.removeItem(LS_LOGS);
-  localStorage.removeItem(LS_PERFIL);
+  rotinas = [];
+  overrides = {};
+  customExs = [];
+  [LS_LOGS, LS_PERFIL, LS_ROTINAS, LS_OVER, LS_CUSTOM, LS_TIMER].forEach(k => localStorage.removeItem(k));
+  aplicaCustom();
   await idbReq((await txFotos('readwrite')).clear());
   toast('Dados apagados.');
   mostrarTab('treino');
@@ -665,8 +829,16 @@ function popularSelects() {
 popularSelects();
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => mostrarTab(b.dataset.tab));
 $('bt-add').onclick = adicionarLog;
-$('sel-exercicio').onchange = e => mostraAnim(e.target.value);
-document.querySelectorAll('[data-timer]').forEach(b => b.onclick = () => iniciarTimer(parseInt(b.dataset.timer, 10)));
+$('sel-exercicio').onchange = e => selecionaExercicio(e.target.value);
+document.querySelectorAll('[data-timer]').forEach(b => b.onclick = () => {
+  localStorage.setItem(LS_TIMER, b.dataset.timer); // lembra a duração para o botão "+1 série"
+  iniciarTimer(parseInt(b.dataset.timer, 10));
+});
+$('bt-salvar-rotina').onclick = salvarRotinaDeHoje;
+$('bt-add-ex').onclick = adicionarExPersonalizado;
+const muscOpts = MUSCULOS.map(m => `<option value="${m.id}">${esc(m.nome)}</option>`).join('');
+$('pex-m1').innerHTML = muscOpts;
+$('pex-m2').innerHTML = '<option value="">— nenhum —</option>' + muscOpts;
 $('sel-progresso').onchange = renderProgresso;
 $('input-foto').onchange = e => prepararFoto(e.target);
 $('bt-salvar-foto').onclick = salvarFoto;

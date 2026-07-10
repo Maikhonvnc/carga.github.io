@@ -100,6 +100,18 @@ li.reg .det{color:var(--mudo);font-size:.8rem;margin-top:2px}
 #anim-ex[hidden]{display:none}
 #anim-ex span{font-size:.85rem;color:var(--ink2)}
 #anim-ex img{width:112px;height:75px;object-fit:cover;border-radius:8px;background:#fff}
+#dica-carga{margin-top:8px}
+#dica-carga b{color:var(--ink2)}
+#dica-carga .alvo{color:var(--azul);font-weight:700}
+
+/* feedback de recuperação e botões de registro */
+.fb{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.fb button{font-size:.72rem;padding:4px 9px;background:transparent;border:1px solid var(--borda);color:var(--ink2);border-radius:6px}
+.bt-mais{background:var(--pagina);border:1px solid var(--borda);color:var(--azul);border-radius:8px;padding:6px 10px;font-weight:700;font-size:.85rem}
+.chip.feito{opacity:.55}
+.reg input{width:58px;padding:6px;font-size:.9rem}
+.reg .bt-ok{padding:6px 10px;font-size:.85rem;margin-left:4px}
+.titulo .x-rot{color:var(--mudo);cursor:pointer;margin-left:8px;background:none;border:none;font-size:.85rem;padding:2px 6px}
 
 /* timer */
 #timer-display{font-size:2.4rem;font-weight:700;text-align:center;padding:6px 0;font-variant-numeric:tabular-nums}
@@ -163,10 +175,17 @@ li.reg .det{color:var(--mudo);font-size:.8rem;margin-top:2px}
   </div>
 
   <div class="card">
+    <h3>📋 Rotinas</h3>
+    <div id="rotinas-lista"></div>
+    <button class="ghost larga" id="bt-salvar-rotina" style="margin-top:8px">Salvar treino de hoje como rotina</button>
+  </div>
+
+  <div class="card">
     <h3>Registrar exercício</h3>
     <label for="sel-exercicio">Exercício</label>
     <select id="sel-exercicio"></select>
     <div id="anim-ex" hidden></div>
+    <p id="dica-carga" class="mudo" hidden></p>
     <div class="linha">
       <div><label for="in-peso">Peso (kg, 0 = corporal)</label>
         <input id="in-peso" type="number" inputmode="decimal" min="0" step="0.5" value="20"></div>
@@ -263,6 +282,18 @@ li.reg .det{color:var(--mudo);font-size:.8rem;margin-top:2px}
     </select>
     <label for="aj-fator">Ajuste fino — sinto que recupero: <span id="aj-fator-txt"></span></label>
     <input id="aj-fator" type="range" min="0.7" max="1.3" step="0.05">
+  </div>
+  <div class="card">
+    <h3>➕ Exercício personalizado</h3>
+    <p class="mudo" style="margin-bottom:6px">Para máquinas da sua academia que não estão na lista.</p>
+    <label for="pex-nome">Nome</label>
+    <input id="pex-nome" type="text" placeholder="ex.: Remada articulada">
+    <label for="pex-m1">Músculo principal</label>
+    <select id="pex-m1"></select>
+    <label for="pex-m2">Músculo secundário (opcional)</label>
+    <select id="pex-m2"></select>
+    <button class="larga" id="bt-add-ex">Adicionar exercício</button>
+    <div id="pex-lista" style="margin-top:8px"></div>
   </div>
   <div class="card">
     <h3>💾 Backup</h3>
