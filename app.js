@@ -150,10 +150,37 @@ function mostrarTab(nome) {
 // ---------- aba Treino ----------
 function renderTreino() {
   $('hoje-data').textContent = '— ' + new Date().toLocaleDateString('pt-BR');
+  renderTilesHoje();
   renderSugestoes();
   renderRotinas();
   renderLogHoje();
   mostraAnim($('sel-exercicio').value);
+}
+
+function semanaKey(ts) { // segunda-feira da semana, como YYYY-MM-DD
+  const d = new Date(ts);
+  d.setDate(d.getDate() - (d.getDay() + 6) % 7);
+  return dayKey(d.getTime());
+}
+
+function renderTilesHoje() {
+  const hoje = dayKey(Date.now());
+  const doDia = logs.filter(l => dayKey(l.ts) === hoje);
+  const volHoje = doDia.reduce((s, l) => s + l.peso * l.reps * l.series, 0);
+  const seriesHoje = doDia.reduce((s, l) => s + l.series, 0);
+  const semanas = new Set(logs.map(l => semanaKey(l.ts)));
+  const estaSemana = new Set(logs.filter(l => semanaKey(l.ts) === semanaKey(Date.now())).map(l => dayKey(l.ts))).size;
+  let streak = 0;
+  let cursor = semanaKey(Date.now());
+  if (!semanas.has(cursor)) cursor = semanaKey(Date.now() - 7 * 864e5); // semana atual ainda sem treino não quebra a sequência
+  while (semanas.has(cursor)) {
+    streak++;
+    cursor = semanaKey(new Date(cursor + 'T12:00').getTime() - 7 * 864e5);
+  }
+  $('tiles-hoje').innerHTML =
+    tile(kg(volHoje) + ' kg', 'volume hoje') +
+    tile(seriesHoje, 'séries hoje') +
+    tile(estaSemana + '×', `na semana${streak > 1 ? ` · ${streak} seguidas` : ''}`);
 }
 
 function renderSugestoes() {
@@ -839,6 +866,17 @@ $('bt-add-ex').onclick = adicionarExPersonalizado;
 const muscOpts = MUSCULOS.map(m => `<option value="${m.id}">${esc(m.nome)}</option>`).join('');
 $('pex-m1').innerHTML = muscOpts;
 $('pex-m2').innerHTML = '<option value="">— nenhum —</option>' + muscOpts;
+
+// armazenamento persistente (impede o Android de apagar os dados do site) + backup automático semanal
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+(function backupAuto() {
+  const ULT = 'carga.backup_ts';
+  const ult = parseInt(localStorage.getItem(ULT), 10) || 0;
+  if (logs.length && Date.now() - ult > 7 * 864e5) {
+    if (ult) { exportar(); toast('Backup automático salvo em Downloads 💾'); }
+    localStorage.setItem(ULT, Date.now()); // na 1ª visita só marca a data, sem baixar arquivo do nada
+  }
+})();
 $('sel-progresso').onchange = renderProgresso;
 $('input-foto').onchange = e => prepararFoto(e.target);
 $('bt-salvar-foto').onclick = salvarFoto;
