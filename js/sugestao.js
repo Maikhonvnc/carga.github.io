@@ -133,12 +133,6 @@ function renderSugestoes() {
   } else if (!hoje.length) {
     html += '<p class="mudo">Todos os grupos estão em recuperação — descanso também é treino 😴</p>';
   }
-  const outros = rod.filter(x => x !== sug && !x.hoje);
-  if (outros.length) {
-    html += `<div class="titulo mudo" style="margin:12px 0 6px;font-size:.8rem">Ou escolha outro grupo (do mais antigo ao mais recente):</div><div class="chips">`
-      + outros.map(x => `<button class="chip${x.pior.pct < 60 ? ' fatigado' : ''}" data-abre-grupo="${esc(x.g.id)}">${esc(nomeGrupo(x.g.id))} <small>${esc(haQuanto(x.ult))}${x.pior.pct < 60 ? ' · ⏳' : ''}</small></button>`).join('')
-      + '</div>';
-  }
   el.innerHTML = html;
   bindChips(el);
   el.querySelectorAll('[data-abre-grupo]').forEach(b => b.onclick = () => {

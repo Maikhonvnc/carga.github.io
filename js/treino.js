@@ -43,10 +43,9 @@ function renderTilesHoje() {
     streak++;
     cursor = semanaKey(new Date(cursor + 'T12:00').getTime() - 7 * 864e5);
   }
-  $('tiles-hoje').innerHTML =
-    tile(sets.length, 'séries hoje') +
-    tile(kg(volHoje) + ' kg', 'volume hoje') +
-    tile(duracao, 'duração') +
+  $('tiles-hoje').innerHTML = (sets.length
+    ? tile(sets.length, 'séries hoje') + tile(kg(volHoje) + ' kg', 'volume hoje') + tile(duracao, 'duração')
+    : '<div class="tile tile-vazio"><div class="valor">Treino de hoje</div><div class="rotulo">nenhuma série ainda — escolha um grupo abaixo</div></div>') +
     tile(estaSemana + '×', `na semana${streak > 1 ? ` · ${streak} seguidas` : ''}`);
 }
 
@@ -56,7 +55,7 @@ function bindChips(cont, rotinaId) {
 
 // cartão principal: mostra grupos, exercícios do grupo ou o painel do exercício aberto
 function renderTreinar() {
-  const foco = !!ativo.ex; // exercício aberto: esconde sugestões/rotinas para focar na execução
+  const foco = !!(ativo.ex || ativo.grupo); // grupo ou exercício aberto: esconde sugestões/rotinas para focar no que foi escolhido
   $('card-sugestoes').hidden = foco;
   $('card-rotinas').hidden = foco;
   const el = $('card-treinar');
@@ -73,13 +72,17 @@ function renderGrupos(el) {
   const hoje = hojeKey();
   const feitos = {};
   logs.forEach(l => { if (dayKey(l.ts) === hoje && exMap[l.ex]) feitos[exMap[l.ex].cat] = (feitos[exMap[l.ex].cat] || 0) + 1; });
-  el.innerHTML = '<h3>🏋️ O que vamos treinar?</h3><div class="grupos">' + gruposVisiveis().map(g => {
+  const rod = rodizioGrupos(), sug = logs.length ? escolheSugerido(rod) : null;
+  const ult = Object.fromEntries(rod.map(x => [x.g.id, x.ult]));
+  el.innerHTML = '<h3>🏋️ O que vamos treinar?</h3><p class="mudo dica-grade">Toque no grupo para ver os exercícios.</p><div class="grupos">' + gruposVisiveis().map(g => {
     const pior = g.musculos.map(m => ({ m, pct: recup[m] })).sort((a, b) => a.pct - b.pct)[0];
-    const status = !pior ? '' : pior.pct >= 85 ? '<span style="color:var(--bom)">pronto</span>'
-      : `<span style="color:${corPct(pior.pct)}">${esc(nomeCurto(pior.m))} ${pior.pct}%</span>`;
-    return `<button class="grupo" data-grupo="${esc(g.id)}">${corpoMini(g.musculos)}
+    const status = !pior ? '' : pior.pct >= 85 ? '<span style="color:var(--bom)">✅ pronto</span>'
+      : `<span style="color:${corPct(pior.pct)}">⏳ ${esc(nomeCurto(pior.m))} ${pior.pct}%</span>`;
+    const quando = feitos[g.id] ? `✓ ${feitos[g.id]} hoje` : haQuanto(ult[g.id]);
+    const eSug = sug && sug.g.id === g.id;
+    return `<button class="grupo${eSug ? ' sugerido' : ''}" data-grupo="${esc(g.id)}">${eSug ? '<span class="g-selo">sugerido</span>' : ''}${corpoMini(g.musculos)}
       <span class="g-nome">${esc(nomeGrupo(g.id))}</span>
-      <span class="g-status">${feitos[g.id] ? `✓${feitos[g.id]} · ` : ''}${status}</span></button>`;
+      <span class="g-status">${status}</span><span class="g-quando">${esc(quando)}</span></button>`;
   }).join('') + '</div>';
   el.querySelectorAll('[data-grupo]').forEach(b => b.onclick = () => {
     ativo.grupo = b.dataset.grupo;
@@ -111,7 +114,7 @@ function renderListaGrupo(el) {
   const u = ultimoTreinoGrupo(ativo.grupo);
   let html = u ? `<button class="ghost larga" id="bt-repetir" style="margin:4px 0 6px">🔁 Repetir o treino de ${dataBr(u.ts)}
       <small class="rep-lista">${esc(u.itens.map(id => exMap[id] ? exMap[id].nome : id).join(' · '))}</small></button>` : '';
-  html += '<p class="mudo" style="margin:6px 0 4px">O desenho mostra a parte do músculo que cada exercício trabalha. Toque na variação que vai usar — cada uma guarda sua própria carga.</p>';
+  html += '<p class="mudo" style="margin:6px 0 4px">Toque na <b class="ink2">variação</b> que vai usar para abrir e registrar. Cada uma guarda a própria carga; o número ao lado é a sua última.</p>';
   let subAtual;
   const temSub = lista.some(m => m.sub);
   for (const m of lista) {
@@ -138,7 +141,7 @@ function renderListaGrupo(el) {
         const top = u && melhorSerie(u.sets);
         const info = top ? (top.peso > 0 ? `${num(top.peso)} kg` : `${top.reps}${v.seg ? ' s' : ' reps'}`) : '';
         return `<button class="chip${feito ? ' hoje' : ''}" data-ex="${v.id}">${feito ? '✓ ' : ''}${esc(v.vnome)}${info ? ` <small>${esc(info)}</small>` : ''}</button>`;
-      }).join('')}<button class="chip chip-mais" data-novavar="${m.id}" aria-label="Adicionar variação de ${esc(m.nome)}">＋</button></div>
+      }).join('')}<button class="chip chip-mais" data-novavar="${m.id}" aria-label="Adicionar variação de ${esc(m.nome)}">＋ variação</button></div>
     </div>`;
   }
   corpo.innerHTML = html;
@@ -720,6 +723,7 @@ function renderLogHoje() {
 // ---------- rotinas ----------
 function renderRotinas() {
   const el = $('rotinas-lista');
+  $('bt-salvar-rotina').hidden = !logs.some(l => dayKey(l.ts) === hojeKey());
   if (!rotinas.length) {
     el.innerHTML = '<p class="mudo">Nenhuma rotina salva — registre um treino e salve como rotina para repetir com um toque.</p>';
     return;

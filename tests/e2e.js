@@ -77,7 +77,7 @@ async function novaPagina(browser, base, dados) {
       ],
     });
     ok((await pg.textContent('.sug-principal')).includes('Pernas'), 'sugere o grupo treinado há mais tempo (Pernas)');
-    ok(await pg.locator('#sugestoes .chip[data-abre-grupo]').count() >= 3, 'mostra os outros grupos ao lado');
+    ok(await pg.locator('.grupo.sugerido[data-grupo="Pernas"]').count() === 1 && (await pg.textContent('[data-grupo="Peito"] .g-quando')).includes('3 dias'), 'grade destaca o sugerido e mostra há quanto tempo cada grupo foi treinado');
     await pg.click('[data-repetir="Pernas"]');
     await pg.waitForTimeout(200);
     ok(await pg.evaluate(() => ativo.ex === 'agachamento' && ativo.rotinaTemp.itens.join() === 'agachamento,leg_press'), 'repetir treino abre o 1º exercício daquele dia');
