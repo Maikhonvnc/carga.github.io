@@ -50,6 +50,7 @@ async function novaPagina(browser, base, dados) {
     const l = await pg.evaluate(() => logs[0]);
     ok(l.sets.length === 3 && l.sets[0].peso === 60, 'migra registro antigo para 3 séries');
     // 2) série cronometrada com esforço → descanso automático
+    ok(await pg.locator('[data-grupo="Peito"] .corpo-mini image').count() === 2 && await pg.locator('[data-grupo="Peito"] .corpo-mini path').count() > 0, 'ícones dos grupos no desenho realista');
     await pg.click('[data-grupo="Peito"]');
     await pg.click('.mov .chip[data-ex="supino_reto"]');
     const mapa = await pg.evaluate(() => ({ imgs: document.querySelectorAll('.p-mapa .mapa-foco image').length, acesos: document.querySelectorAll('.p-mapa .mapa-foco path[fill="#ff1a1a"]').length }));
@@ -123,6 +124,8 @@ async function novaPagina(browser, base, dados) {
     ok(await pg.locator('.vm').count() === 1, 'volume por músculo do grupo');
     await pg.click('[data-evo="elevacao_lateral"]');
     ok(await pg.locator('.evo-det .grafico svg').count() === 2, 'detalhe com gráficos');
+    await pg.click('nav [data-tab="musculos"]');
+    ok(await pg.locator('#mapa-corpo .mapa-fadiga image').count() === 2 && await pg.locator('#mapa-corpo .mapa-fadiga path').count() > 0, 'aba Músculos mostra a fadiga no desenho realista');
     for (const aba of ['musculos', 'maquinas', 'ajustes', 'treino']) await pg.click(`nav [data-tab="${aba}"]`);
     await pg.click('nav [data-tab="ajustes"]');
     const [dl] = await Promise.all([pg.waitForEvent('download'), pg.click('#bt-exportar')]);
