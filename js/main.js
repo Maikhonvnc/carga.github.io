@@ -65,6 +65,7 @@ if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
 })();
 $('input-foto').onchange = e => prepararFoto(e.target);
 $('input-foto-painel').onchange = e => fotoDoPainel(e.target);
+$('input-gif-painel').onchange = e => gifDoPainel(e.target);
 $('bt-salvar-foto').onclick = salvarFoto;
 $('bt-cancelar-foto').onclick = () => { fotoPendente = null; $('form-foto').hidden = true; };
 $('lightbox').onclick = () => $('lightbox').classList.remove('aberto');

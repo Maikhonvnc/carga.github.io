@@ -1,18 +1,22 @@
-/* Carga — Aba Máquinas: fotos das máquinas em IndexedDB. */
+/* Carga — Aba Máquinas: fotos das máquinas (e GIFs de execução do usuário) em IndexedDB. */
 'use strict';
 
 // ---------- aba Máquinas (fotos em IndexedDB) ----------
 let dbPromise = null;
 function db() {
   dbPromise ??= new Promise((res, rej) => {
-    const r = indexedDB.open('carga', 1);
-    r.onupgradeneeded = () => r.result.createObjectStore('fotos', { keyPath: 'id' });
+    const r = indexedDB.open('carga', 2);
+    r.onupgradeneeded = () => { // v2: GIFs de execução que o usuário adiciona (um por variação, só neste aparelho)
+      if (!r.result.objectStoreNames.contains('fotos')) r.result.createObjectStore('fotos', { keyPath: 'id' });
+      if (!r.result.objectStoreNames.contains('gifs')) r.result.createObjectStore('gifs', { keyPath: 'ex' });
+    };
     r.onsuccess = () => res(r.result);
     r.onerror = () => rej(r.error);
   });
   return dbPromise;
 }
 const txFotos = async modo => (await db()).transaction('fotos', modo).objectStore('fotos');
+const txGifs = async modo => (await db()).transaction('gifs', modo).objectStore('gifs');
 const idbReq = req => new Promise((res, rej) => { req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); });
 
 let fotoPendente = null;

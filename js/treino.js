@@ -626,8 +626,9 @@ function renderFimPainel() {
 let urlsPainel = [], fotoToken = 0;
 async function renderFotosPainel() {
   const exId = ativo.ex, tk = ++fotoToken;
-  let fotos = [];
+  let fotos = [], gif = null;
   try { fotos = (await idbReq((await txFotos('readonly')).getAll())).filter(f => f.ex === exId); } catch { /* sem IndexedDB */ }
+  try { gif = await idbReq((await txGifs('readonly')).get(exId)); } catch { /* sem IndexedDB */ }
   const el = $('fotos-maq');
   if (!el || tk !== fotoToken || ativo.ex !== exId) return;
   urlsPainel.forEach(URL.revokeObjectURL);
@@ -636,9 +637,29 @@ async function renderFotosPainel() {
     const u = URL.createObjectURL(f.blob);
     urlsPainel.push(u);
     return `<figure><img src="${u}" alt="Sua máquina">${f.nota ? `<figcaption>${esc(f.nota)}</figcaption>` : ''}</figure>`;
-  }).join('') + `<button class="chip" id="bt-foto-painel">📷 ${fotos.length ? 'Outra foto' : 'Fotografar a máquina'}</button>`;
+  }).join('') + `<button class="chip" id="bt-foto-painel">📷 ${fotos.length ? 'Outra foto' : 'Fotografar a máquina'}</button>`
+    + `<button class="chip" id="bt-gif-painel">🎬 ${gif ? 'Trocar GIF' : 'Adicionar GIF'}</button>`
+    + (gif ? '<button class="chip" id="bt-gif-remover">Remover GIF</button>' : '');
   el.querySelectorAll('img').forEach(img => img.onclick = () => abreLightbox(img.src));
   $('bt-foto-painel').onclick = () => $('input-foto-painel').click();
+  $('bt-gif-painel').onclick = () => $('input-gif-painel').click();
+  if (gif) $('bt-gif-remover').onclick = async () => {
+    if (!confirm('Remover o GIF desta variação?')) return;
+    await idbReq((await txGifs('readwrite')).delete(exId));
+    mostraAnim(exId);
+    renderFotosPainel();
+  };
+}
+
+// GIF/vídeo de execução escolhido pelo usuário: um por variação, guardado só neste aparelho
+async function gifDoPainel(input) {
+  const f = input.files && input.files[0];
+  input.value = '';
+  if (!f || !ativo.ex) return;
+  await idbReq((await txGifs('readwrite')).put({ ex: ativo.ex, blob: f, ts: Date.now() }));
+  toast('GIF salvo nesta variação 🎬');
+  mostraAnim(ativo.ex);
+  renderFotosPainel();
 }
 
 async function fotoDoPainel(input) {

@@ -13,6 +13,7 @@
   --ink:#ffffff; --ink2:#c3c2b7; --mudo:#898781; --grade:#2c2c2a;
   --azul:#3987e5; --aqua:#199e70;
   --bom:#0ca30c; --atencao:#fab219; --serio:#ec835a; --critico:#d03b3b;
+  --foco:#e5383b;
   --nav-h:58px;
 }
 *{box-sizing:border-box;margin:0}
@@ -147,13 +148,14 @@ li.reg .det{color:var(--mudo);font-size:.8rem;margin-top:2px}
 .mov-mapa{flex:0 0 106px;display:flex;justify-content:center}
 .mov-txt{flex:1;min-width:0}
 .mov-foco{font-size:.78rem;color:var(--ink2);margin-top:3px;line-height:1.35}
-.mov-foco b{color:var(--azul);font-weight:600}
+.mov-foco b{color:var(--foco);font-weight:600}
 .mov-txt .mov-musc{margin:2px 0 0}
-.mapa-foco{display:block;width:auto;max-width:100%}
+.mapa-foco{display:flex;gap:4px;justify-content:center;max-width:100%}
+.mapa-foco>svg{display:block;max-width:calc(50% - 2px);border-radius:8px;background:#111}
 .p-mapa{flex:1;min-width:0;display:flex;justify-content:center}
 .p-foco{margin-top:10px;font-size:.82rem;color:var(--ink2);line-height:1.45}
 .p-foco .it{display:flex;gap:8px;align-items:baseline}
-.p-foco .it::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:var(--azul);transform:translateY(-1px)}
+.p-foco .it::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:var(--foco);transform:translateY(-1px)}
 .p-foco .it b{color:var(--ink)}
 .p-foco .aux{color:var(--mudo);margin-top:3px}
 .t-sobe{color:var(--bom);font-weight:600}.t-desce{color:var(--serio);font-weight:600}.t-igual{color:var(--mudo)}
@@ -189,6 +191,7 @@ details.hist summary{cursor:pointer;font-weight:600;font-size:.88rem}
 }
 #anim-ex img{width:100%;height:100%;object-fit:cover;background:#fff;cursor:zoom-in}
 #anim-ex svg{width:92px;height:92px}
+#anim-ex.gif img,#anim-ex video{width:100%;height:100%;object-fit:contain;background:#000}
 .p-musc{flex:1;min-width:0}
 .p-m{font-size:.75rem;color:var(--ink2);margin-bottom:6px}
 .p-m .barra{height:5px;margin-top:3px}
@@ -510,6 +513,7 @@ body.com-barra #toast{bottom:146px}
 </nav>
 
 <input type="file" accept="image/*" capture="environment" id="input-foto-painel" hidden>
+<input type="file" accept="image/gif,image/webp,image/*,video/*" id="input-gif-painel" hidden>
 <div id="toast"></div>
 <div id="lightbox"><img alt="Foto ampliada"></div>
 
@@ -519,6 +523,7 @@ body.com-barra #toast{bottom:146px}
 <script src="js/treino.js"></script>
 <script src="js/midia.js"></script>
 <script src="js/cronometro.js"></script>
+<script src="vendor/anatomia/realista.js"></script>
 <script src="js/corpo.js"></script>
 <script src="js/evolucao.js"></script>
 <script src="js/maquinas.js"></script>
