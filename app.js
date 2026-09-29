@@ -81,7 +81,8 @@ function montaCatalogo() {
     id: v.id, mov: m.id, cat: m.cat, vnome: v.nome,
     nome: m.vars.length > 1 ? `${m.nome} · ${v.nome}` : m.nome,
     musculos: v.musculos || m.musculos, foco: v.foco || m.foco || [],
-    anim: m.anim, img: 'img' in v ? v.img : m.img,
+    // foto: a local da própria variação; senão a do banco aberto (fe); senão a do movimento; senão o boneco
+    anim: m.anim, img: 'img' in v ? v.img : (m.img === v.id || !v.fe ? m.img : null), fe: v.fe || null,
     dicas: [...(m.dicas || []), ...(v.dica ? [v.dica] : [])],
     inc: v.inc || INC_EQ[v.eq] || 2.5, corpo: v.eq === 'corpo', seg: !!m.seg,
     faixa: m.faixa || [8, 12], desc: m.desc || (m.tipo === 'composto' ? 120 : 75),
@@ -960,22 +961,24 @@ function mostraAnim(exId) {
   pararAnim();
   const box = $('anim-ex'), ex = exMap[exId];
   if (!box) return;
-  if (!ex || (!ex.img && !ANIMS[ex.anim])) { box.hidden = true; return; }
-  if (ex.img) montaFotos(box, ex);
+  if (!ex || (!ex.img && !ex.fe && !ANIMS[ex.anim])) { box.hidden = true; return; }
+  if (ex.img) montaFotos(box, ex, q => `imgs/${ex.img}_${q}.jpg`);
+  else if (ex.fe) montaFotos(box, ex, q => `${FE_URL}/${ex.fe}/${q}.jpg`);
   else montaBoneco(box, ex.anim);
 }
 
 // dois quadros alternados = efeito GIF (fotos do dataset aberto free-exercise-db); sem foto, cai no boneco
-function montaFotos(box, ex) {
+const FE_URL = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises';
+function montaFotos(box, ex, quadroUrl) {
   const token = animToken;
   box.hidden = false;
-  box.innerHTML = `<img src="imgs/${ex.img}_0.jpg" alt="Execução: ${esc(ex.nome)}">`;
+  box.innerHTML = `<img src="${quadroUrl(0)}" alt="Execução: ${esc(ex.nome)}">`;
   const img = box.querySelector('img');
-  img.onerror = () => { if (token === animToken) { pararAnim(); montaBoneco(box, ex.anim); } };
+  img.onerror = () => { if (token === animToken) { pararAnim(); montaBoneco(box, ex.anim); } }; // sem internet/foto: boneco
   img.onclick = () => abreLightbox(img.src);
-  new Image().src = `imgs/${ex.img}_1.jpg`; // pré-carrega o 2º quadro
+  new Image().src = quadroUrl(1); // pré-carrega o 2º quadro
   let quadro = 0;
-  animInterval = setInterval(() => { quadro = 1 - quadro; img.src = `imgs/${ex.img}_${quadro}.jpg`; }, 700);
+  animInterval = setInterval(() => { quadro = 1 - quadro; img.src = quadroUrl(quadro); }, 700);
 }
 
 function montaBoneco(box, animId) {

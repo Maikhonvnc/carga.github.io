@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0d0d">
+<title>Carga — prévia do corpo e mídia</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+:root{
+  --pagina:#0d0d0d; --card:#1a1a19; --borda:rgba(255,255,255,.10);
+  --ink:#fff; --ink2:#c3c2b7; --mudo:#898781; --azul:#3987e5;
+  --foco:#e5383b; --aux:#f08a8c; --aux2:#f6bcbd;
+}
+*{box-sizing:border-box;margin:0}
+body{background:var(--pagina);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;max-width:980px;margin:0 auto;padding:14px 12px 40px}
+h1{font-size:1.2rem}
+h2{font-size:1rem;margin-bottom:8px}
+p.mudo,.mudo{color:var(--mudo);font-size:.85rem}
+a{color:var(--azul)}
+.card{background:var(--card);border:1px solid var(--borda);border-radius:12px;padding:14px;margin-top:12px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:var(--pagina);border:1px solid var(--borda);color:var(--ink);border-radius:999px;padding:7px 12px;font-size:.85rem;cursor:pointer;font-family:inherit}
+.chip.sel{border-color:var(--azul);background:rgba(57,135,229,.16)}
+select{width:100%;margin-top:10px;padding:10px;border-radius:8px;border:1px solid var(--borda);background:var(--pagina);color:var(--ink);font-size:1rem}
+.foco-txt{margin-top:10px;font-size:.88rem;color:var(--ink2);line-height:1.5}
+.foco-txt b{color:var(--foco)}
+.legenda{display:flex;gap:14px;flex-wrap:wrap;font-size:.75rem;color:var(--mudo);margin-top:8px}
+.legenda i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.opcoes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
+@media (max-width:760px){.opcoes{grid-template-columns:1fr}}
+.opcao h2 small{color:var(--mudo);font-weight:400;font-size:.75rem;display:block;margin-top:2px}
+.vistas{display:flex;gap:6px;justify-content:center;align-items:flex-start}
+.vistas>svg{display:block;width:calc(50% - 3px);height:auto;max-height:380px}
+.vistas.um>svg{width:100%}
+.tema{margin-top:8px;display:flex;gap:6px}
+.tema .chip{font-size:.75rem;padding:5px 10px}
+.midias{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:12px}
+.midia{background:var(--pagina);border:1px solid var(--borda);border-radius:10px;padding:10px}
+.midia h3{font-size:.85rem;margin-bottom:6px}
+.midia img{width:100%;aspect-ratio:3/2;object-fit:cover;border-radius:8px;background:#fff;display:block}
+.midia .vazio{aspect-ratio:3/2;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--mudo);font-size:.8rem;border:1px dashed var(--borda);border-radius:8px;padding:10px}
+.btn{display:block;text-align:center;background:var(--azul);color:#fff;border-radius:8px;padding:11px;font-weight:600;text-decoration:none;margin-top:8px;font-size:.9rem}
+.btn.ghost{background:transparent;border:1px solid var(--borda);color:var(--ink2)}
+.creditos{font-size:.72rem;color:var(--mudo);margin-top:18px;line-height:1.5}
+</style>
+</head>
+<body>
+<h1>🧪 Prévia — desenho do corpo e mídia</h1>
+<p class="mudo" style="margin-top:4px">Escolha um exercício e compare as três opções de desenho. Nada aqui altera o app; é só para decidir. <a href="./">← voltar ao app</a></p>
+
+<div class="card">
+  <div class="chips" id="grupos"></div>
+  <select id="sel-ex"></select>
+  <div class="foco-txt" id="foco-txt"></div>
+  <div class="legenda"><span><i style="background:var(--foco)"></i>foco principal</span><span><i style="background:var(--aux)"></i>auxiliar</span><span><i style="background:var(--aux2)"></i>auxiliar leve</span></div>
+</div>
+
+<div class="opcoes">
+  <div class="card opcao"><h2>Atual<small>boneco simplificado (o que está no app hoje)</small></h2><div class="vistas um" id="op-atual"></div></div>
+  <div class="card opcao"><h2>B · Realista<small>ilustração detalhada; o músculo "acende" por cima do desenho</small></h2>
+    <div class="vistas" id="op-b"></div>
+    <div class="tema"><button class="chip sel" data-tema="light">fundo claro</button><button class="chip" data-tema="dark">fundo escuro</button></div></div>
+  <div class="card opcao"><h2>C · Segmentado<small>70+ regiões: 3 partes do ombro, cabeças do tríceps, glúteo médio, sóleo…</small></h2><div class="vistas" id="op-c"></div></div>
+</div>
+
+<div class="card">
+  <h2>🎬 Mídia de execução</h2>
+  <p class="mudo">Como a execução pode ser mostrada no painel do exercício.</p>
+  <div class="midias">
+    <div class="midia"><h3>Foto atual do app</h3><div id="m-atual"></div></div>
+    <div class="midia"><h3>Fotos do banco aberto (novas)</h3><div id="m-fe"></div></div>
+    <div class="midia"><h3>GIF animado (teste ExerciseDB)</h3><div id="m-gif"></div></div>
+    <div class="midia"><h3>Vídeo de execução</h3><div id="m-video"></div></div>
+  </div>
+</div>
+
+<p class="creditos">Opção B: ilustração e máscaras do pacote <a href="https://github.com/crmapache/js-rich-body-highlighter">js-rich-body-highlighter</a> (MIT).
+Opção C: mapa do pacote <a href="https://github.com/vulovix/body-muscles">body-muscles</a> (Apache-2.0, © Ivan Vulović).
+Fotos: <a href="https://github.com/yuhonas/free-exercise-db">free-exercise-db</a> (domínio público).</p>
+
+<svg id="medidor" width="1" height="1" style="position:absolute;left:-9999px;visibility:hidden"></svg>
+<script src="data.js"></script>
+<script src="vendor/anatomia/realista.js"></script>
+<script src="vendor/anatomia/segmentado.js"></script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const FE = id => `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${id}`;
+
+// ---------- catálogo (mesma regra do app) ----------
+const EXS = MOVIMENTOS.flatMap(m => m.vars.map(v => ({
+  id: v.id, cat: m.cat, mov: m, v, nome: m.vars.length > 1 ? `${m.nome} · ${v.nome}` : m.nome,
+  musculos: v.musculos || m.musculos, foco: v.foco || m.foco || [], anim: m.anim, fe: v.fe,
+  img: 'img' in v ? v.img : (m.img === v.id || !v.fe ? m.img : null),
+})));
+const muscNome = Object.fromEntries(MUSCULOS.map(m => [m.id, m.nome.split(' (')[0].replace(' de coxa', '')]));
+
+// nível de cada músculo: foco (principal) ou auxiliar; partes definidas restringem onde acende
+function niveis(ex) {
+  const ms = Object.entries(ex.musculos).sort((a, b) => b[1] - a[1]);
+  const top = ms[0][1];
+  const nivel = f => f >= 0.4 || f === top ? 'foco' : f >= 0.2 ? 'aux' : 'aux2';
+  const partes = ex.foco.filter(id => PARTES[id]);
+  const porMusc = {};
+  for (const [m, f] of ms) porMusc[m] = { n: nivel(f), partes: partes.filter(id => PARTES[id].p[0].m === m) };
+  // partes cujo 1º músculo é outro, mas que também cobrem este (ex.: braquial cobre o antebraço)
+  return { porMusc, partes };
+}
+const COR = { foco: 'var(--foco)', aux: 'var(--aux)', aux2: 'var(--aux2)' };
+const MUSC_INF = ['gluteos', 'quadriceps', 'posteriores', 'adutores', 'panturrilha'];
+function regiao(ex) { // 'sup' | 'inf' | 'tudo'
+  const env = Object.keys(ex.musculos).filter(m => ex.musculos[m] >= 0.15);
+  const baixo = env.some(m => MUSC_INF.includes(m)), cima = env.some(m => !MUSC_INF.includes(m) && m !== 'lombar');
+  return !baixo ? 'sup' : !cima ? 'inf' : 'tudo';
+}
+
+// ---------- opção C: body-muscles ----------
+const MUSC_C = {
+  peito: ['chest-upper', 'chest-lower'], costas: ['lats-upper', 'lats-mid', 'lats-lower'], trapezio: ['traps-upper', 'traps-mid', 'traps-lower'],
+  ombros: ['shoulder-front', 'shoulder-side', 'deltoid-rear'], biceps: ['biceps'], triceps: ['triceps-long', 'triceps-lateral'],
+  antebraco: ['forearm', 'forearm-flexors', 'forearm-extensors'], abdomen: ['abs-upper', 'abs-lower', 'obliques'],
+  lombar: ['lower-back-erectors', 'lower-back-ql'], gluteos: ['gluteus-maximus', 'gluteus-medius'], quadriceps: ['quads'],
+  posteriores: ['hamstrings-medial', 'hamstrings-lateral'], adutores: ['adductors'],
+  panturrilha: ['calves-gastroc-medial', 'calves-gastroc-lateral', 'calves-soleus'],
+};
+const PART_C = {
+  delt_ant: ['shoulder-front'], delt_lat: ['shoulder-side'], delt_post: ['deltoid-rear'],
+  peito_sup: ['chest-upper'], peito_med: ['chest-upper', 'chest-lower'], peito_inf: ['chest-lower'],
+  dorsal: ['lats-upper', 'lats-mid', 'lats-lower'], meio_costas: ['traps-mid', 'traps-lower'], trap_sup: ['traps-upper'],
+  biceps_longa: ['biceps'], biceps_curta: ['biceps'], braquial: ['biceps', 'forearm'],
+  triceps_longa: ['triceps-long'], triceps_lat: ['triceps-lateral'], antebraco_flex: ['forearm', 'forearm-flexors'], antebraco_ext: ['forearm-extensors'],
+  gluteo_max: ['gluteus-maximus'], gluteo_med: ['gluteus-medius'], gastro: ['calves-gastroc-medial', 'calves-gastroc-lateral'], soleo: ['calves-soleus'],
+  abd_sup: ['abs-upper'], abd_inf: ['abs-lower'], obliquos: ['obliques'],
+};
+const baseC = id => id.replace(/-(left|right)$/, '');
+function desenhaC(ex) {
+  const { porMusc } = niveis(ex);
+  const cor = {}; // id base → nível (o mais forte vence)
+  const ordem = { foco: 3, aux: 2, aux2: 1 };
+  const marca = (ids, n) => ids.forEach(i => { if (!cor[i] || ordem[n] > ordem[cor[i]]) cor[i] = n; });
+  for (const [m, { n, partes }] of Object.entries(porMusc)) {
+    if (partes.length) partes.forEach(p => marca(PART_C[p] || [], n));
+    else marca(MUSC_C[m] || [], n);
+  }
+  const vista = (lista, vb) => `<svg viewBox="${vb}">${lista.map(([id, d]) => {
+    const n = cor[baseC(id)];
+    return `<path d="${d}" fill="${n ? COR[n] : '#3a3a37'}" stroke="#1a1a19" stroke-width=".12"><title>${esc(id)}</title></path>`;
+  }).join('')}</svg>`;
+  const [y0, h] = { sup: [0, 50], inf: [38, 55], tudo: [0, 93] }[regiao(ex)];
+  $('op-c').innerHTML = vista(ANAT_SEG.f, `0 ${y0} 35 ${h}`) + vista(ANAT_SEG.c, `37 ${y0} 35 ${h}`);
+}
+
+// ---------- opção B: ilustração + máscaras (recorte das partes por fração da caixa de cada lado) ----------
+const MUSC_B = {
+  peito: ['pectoralis'], costas: ['lats'], trapezio: ['trapezius', 'upper_back'], ombros: ['deltoids', 'deltoids_back'], biceps: ['biceps'],
+  triceps: ['triceps'], antebraco: ['forearms', 'forearms_back'], abdomen: ['rectus_abdominis', 'obliques'], lombar: ['lower_back'],
+  gluteos: ['glutes'], quadriceps: ['quadriceps'], posteriores: ['hamstrings'], panturrilha: ['calves', 'calves_back'], adutores: [],
+};
+// [máscara, [x0, x1, y0, y1]] — x medido a partir da borda de FORA do corpo (0) até a linha do meio (1)
+const PART_B = {
+  delt_ant: [['deltoids', [0.35, 1, 0, 1]]], delt_lat: [['deltoids', [0, 0.45, 0, 1]], ['deltoids_back', [0, 0.45, 0, 1]]],
+  delt_post: [['deltoids_back', [0.35, 1, 0, 1]]],
+  peito_sup: [['pectoralis', [0, 1, 0, 0.42]]], peito_med: [['pectoralis', [0, 1, 0.3, 0.72]]], peito_inf: [['pectoralis', [0, 1, 0.6, 1]]],
+  dorsal: [['lats', null]], meio_costas: [['upper_back', [0, 1, 0.4, 1]]], trap_sup: [['upper_back', [0, 1, 0, 0.45]], ['trapezius', null]],
+  biceps_longa: [['biceps', [0, 0.5, 0, 1]]], biceps_curta: [['biceps', [0.5, 1, 0, 1]]], braquial: [['biceps', [0, 1, 0.65, 1]], ['forearms', [0, 1, 0, 0.35]]],
+  triceps_longa: [['triceps', [0.5, 1, 0, 1]]], triceps_lat: [['triceps', [0, 0.5, 0, 1]]],
+  antebraco_flex: [['forearms', null]], antebraco_ext: [['forearms_back', null]],
+  gluteo_max: [['glutes', null]], gluteo_med: [['glutes', [0, 0.55, 0, 0.4]]],
+  gastro: [['calves_back', [0, 1, 0, 0.55]]], soleo: [['calves_back', [0, 1, 0.5, 1]]],
+  abd_sup: [['rectus_abdominis', [0, 1, 0, 0.5]]], abd_inf: [['rectus_abdominis', [0, 1, 0.5, 1]]], obliquos: [['obliques', null]],
+};
+const MASK = Object.fromEntries(ANAT_REAL.masks.map(m => [m.id, m]));
+const MEIO = ANAT_REAL.w / 2;
+// caixa (em coordenadas da máscara) de cada lado do corpo — medida uma vez no navegador
+const caixas = {};
+(function medir() {
+  const NS = 'http://www.w3.org/2000/svg', svg = $('medidor');
+  for (const m of ANAT_REAL.masks) {
+    const partes = m.d.split(/(?=M)/);
+    const lados = { e: null, d: null };
+    for (const sub of partes) {
+      const p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', sub);
+      svg.appendChild(p);
+      const b = p.getBBox();
+      svg.removeChild(p);
+      const cx = (b.x + b.width / 2) + m.o[0] * ANAT_REAL.px2mm;
+      const lado = cx < MEIO ? 'e' : 'd';
+      const u = lados[lado];
+      lados[lado] = !u ? { x0: b.x, x1: b.x + b.width, y0: b.y, y1: b.y + b.height }
+        : { x0: Math.min(u.x0, b.x), x1: Math.max(u.x1, b.x + b.width), y0: Math.min(u.y0, b.y), y1: Math.max(u.y1, b.y + b.height) };
+    }
+    caixas[m.id] = lados;
+  }
+})();
+
+let temaB = 'light', clipN = 0;
+function desenhaB(ex) {
+  const { porMusc } = niveis(ex);
+  const pecas = { f: [], c: [] }; // {mask, frac, n}
+  for (const [m, { n, partes }] of Object.entries(porMusc)) {
+    const lista = partes.length ? partes.flatMap(p => PART_B[p] || []) : (MUSC_B[m] || []).map(id => [id, null]);
+    for (const [id, frac] of lista) if (MASK[id]) pecas[MASK[id].v].push({ mk: MASK[id], frac, n });
+  }
+  const intens = { foco: 0.85, aux: 0.5, aux2: 0.3 };
+  const blend = temaB === 'dark' ? 'color' : 'multiply';
+  const vista = v => {
+    let defs = '', corpo = '';
+    for (const { mk, frac, n } of pecas[v]) {
+      const t = `translate(${mk.o[0] * ANAT_REAL.px2mm} ${mk.o[1] * ANAT_REAL.px2mm})`;
+      let clip = '';
+      if (frac) {
+        const id = 'cb' + (++clipN);
+        const rects = ['e', 'd'].map(l => {
+          const b = caixas[mk.id][l];
+          if (!b) return '';
+          const w = b.x1 - b.x0, h = b.y1 - b.y0;
+          const [fx0, fx1, fy0, fy1] = frac;
+          const x = l === 'e' ? b.x0 + fx0 * w : b.x1 - fx1 * w; // "fora" é a esquerda no lado esquerdo e a direita no direito
+          return `<rect x="${x}" y="${b.y0 + fy0 * h}" width="${(fx1 - fx0) * w}" height="${(fy1 - fy0) * h}"/>`;
+        }).join('');
+        defs += `<clipPath id="${id}">${rects}</clipPath>`;
+        clip = ` clip-path="url(#${id})"`;
+      }
+      corpo += `<g transform="${t}"><path d="${mk.d}" fill="${n === 'foco' ? '#ff1a1a' : '#ff4d4d'}" fill-opacity="${intens[n]}"${clip} style="mix-blend-mode:${blend}"/></g>`;
+    }
+    const img = `vendor/anatomia/male-${v === 'f' ? 'front' : 'back'}-${temaB}.webp`;
+    const W = ANAT_REAL.w, H = ANAT_REAL.h;
+    const [fy0, fy1] = { sup: [0.04, 0.55], inf: [0.42, 1], tudo: [0, 1] }[regiao(ex)];
+    return `<svg viewBox="${0.14 * W} ${fy0 * H} ${0.72 * W} ${(fy1 - fy0) * H}" style="isolation:isolate;border-radius:8px;background:${temaB === 'dark' ? '#111' : '#f4f4f2'}">
+      <defs>${defs}</defs><image href="${img}" width="${ANAT_REAL.w}" height="${ANAT_REAL.h}"/>${corpo}</svg>`;
+  };
+  $('op-b').innerHTML = vista('f') + vista('c');
+}
+
+// ---------- desenho atual do app (mesma lógica do mapaFoco, em vermelho) ----------
+const espelha = ([tag, at]) => {
+  const a = { ...at };
+  if (tag === 'ellipse') a.cx = 200 - a.cx;
+  else if (tag === 'rect') a.x = 200 - a.x - a.width;
+  else a.d = a.d.replace(/(-?[\d.]+),(-?[\d.]+)/g, (s, x, y) => `${200 - parseFloat(x)},${y}`);
+  return [tag, a];
+};
+function desenhaAtual(ex) {
+  const { porMusc } = niveis(ex);
+  const partes = ex.foco.map(id => PARTES[id]).filter(Boolean);
+  const comParte = new Set(partes.flatMap(pt => pt.p.map(pc => pc.m)));
+  const forma = ([tag, at], fill) => `<${tag} ${Object.entries(at).map(([k, v]) => `${k}="${v}"`).join(' ')} fill="${fill}" stroke="#1a1a19" stroke-width="1.5"/>`;
+  const inst = s => s.esp ? [s.forma, espelha(s.forma)] : [s.forma];
+  const recortes = r => { const m = [200 - r[0] - r[2], r[1], r[2], r[3]]; return m[0] === r[0] ? [r] : [r, m]; };
+  let g = '';
+  for (const [vista, dx] of [['f', -40], ['c', 80]]) {
+    g += `<g transform="translate(${dx},0)">`;
+    for (const s of CORPO_SVG[vista]) {
+      const n = s.m && porMusc[s.m] && !comParte.has(s.m) ? porMusc[s.m].n : null;
+      for (const fo of inst(s)) g += forma(fo, !s.m ? '#262624' : n ? COR[n] : '#3a3a37');
+    }
+    for (const pt of partes) for (const pc of pt.p) {
+      if (pc.v !== vista) continue;
+      const n = (porMusc[pt.p[0].m] || { n: 'aux' }).n;
+      for (const s of CORPO_SVG[vista].filter(x => x.m === pc.m)) for (const fo of inst(s)) {
+        if (!pc.r) g += forma(fo, COR[n]);
+        else for (const r of recortes(pc.r)) g += `<svg x="${r[0]}" y="${r[1]}" width="${r[2]}" height="${r[3]}" viewBox="${r.join(' ')}">${forma(fo, COR[n])}</svg>`;
+      }
+    }
+    g += '</g>';
+  }
+  const [y0, h] = { sup: [4, 156], inf: [140, 168], tudo: [4, 304] }[regiao(ex)];
+  $('op-atual').innerHTML = `<svg viewBox="0 ${y0} 240 ${h}">${g}</svg>`;
+}
+
+// ---------- mídia ----------
+let animTimer = null;
+function doisQuadros(el, base) { // alterna _0/_1 como um GIF
+  el.innerHTML = `<img src="${base(0)}" alt="">`;
+  const img = el.querySelector('img');
+  let q = 0;
+  img.onerror = () => { el.innerHTML = '<div class="vazio">Não carregou.</div>'; };
+  return setInterval(() => { q = 1 - q; img.src = base(q); }, 750);
+}
+let gifToken = 0;
+async function buscaGif(ex) {
+  const el = $('m-gif'), tk = ++gifToken;
+  if (!ex.fe) { el.innerHTML = '<div class="vazio">Sem nome em inglês para buscar.</div>'; return; }
+  const termo = ex.fe.replace(/_-_/g, ' ').replace(/_/g, ' ').toLowerCase();
+  el.innerHTML = `<div class="vazio">Buscando "${esc(termo)}"…</div>`;
+  const urls = [
+    `https://exercisedb-api.vercel.app/api/v1/exercises/search?q=${encodeURIComponent(termo)}&limit=3`,
+    `https://www.exercisedb.dev/api/v1/exercises/search?q=${encodeURIComponent(termo)}&limit=3`,
+  ];
+  for (const u of urls) {
+    try {
+      const r = await fetch(u);
+      if (!r.ok) continue;
+      const j = await r.json();
+      const lista = Array.isArray(j) ? j : j.data || (j.data && j.data.exercises) || [];
+      const item = (Array.isArray(lista) ? lista : lista.exercises || []).find(x => x && x.gifUrl);
+      if (tk !== gifToken) return;
+      if (item) {
+        el.innerHTML = `<img src="${esc(item.gifUrl)}" alt="" style="background:#fff;object-fit:contain"><p class="mudo" style="margin-top:6px">"${esc(item.name)}" — serviço gratuito da ExerciseDB</p>`;
+        return;
+      }
+    } catch { /* tenta o próximo */ }
+  }
+  if (tk === gifToken) el.innerHTML = '<div class="vazio">O serviço de GIFs não respondeu daqui. Se não funcionar no seu celular, essa opção fica descartada.</div>';
+}
+function midia(ex) {
+  clearInterval(animTimer);
+  (window.timersMidia || []).forEach(clearInterval);
+  window.timersMidia = [];
+  const mA = $('m-atual'), mF = $('m-fe');
+  if (ex.img) window.timersMidia.push(doisQuadros(mA, q => `imgs/${ex.img}_${q}.jpg`));
+  else mA.innerHTML = '<div class="vazio">Sem foto no app — hoje aparece o boneco animado.</div>';
+  if (ex.fe) window.timersMidia.push(doisQuadros(mF, q => `${FE(ex.fe)}/${q}.jpg`));
+  else mF.innerHTML = '<div class="vazio">O banco aberto não tem esta variação.</div>';
+  buscaGif(ex);
+  const q = encodeURIComponent(`${ex.mov.nome} ${ex.v.nome} execução correta`);
+  $('m-video').innerHTML = `<div class="vazio">Abre vídeos de execução no YouTube (com o que prestar atenção), já buscando por esta variação.</div>
+    <a class="btn" href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">▶ Ver vídeos de execução</a>`;
+}
+
+// ---------- seleção ----------
+let grupo = 'Ombros';
+function mostraGrupos() {
+  $('grupos').innerHTML = GRUPOS.map(g => `<button class="chip${g.id === grupo ? ' sel' : ''}" data-g="${g.id}">${g.id}</button>`).join('');
+  $('grupos').querySelectorAll('[data-g]').forEach(b => b.onclick = () => { grupo = b.dataset.g; mostraGrupos(); preencheSelect(); });
+}
+function preencheSelect(pref) {
+  const lista = EXS.filter(e => e.cat === grupo);
+  $('sel-ex').innerHTML = lista.map(e => `<option value="${e.id}">${esc(e.nome)}</option>`).join('');
+  if (pref && lista.some(e => e.id === pref)) $('sel-ex').value = pref;
+  mostra();
+}
+function mostra() {
+  const ex = EXS.find(e => e.id === $('sel-ex').value);
+  const { porMusc } = niveis(ex);
+  const nomes = (n) => Object.entries(porMusc).filter(([, x]) => x.n === n || (n === 'aux' && x.n === 'aux2'))
+    .flatMap(([m, x]) => x.partes.length ? x.partes.map(p => PARTES[p].nome) : [muscNome[m]]);
+  $('foco-txt').innerHTML = `Foco: <b>${esc(nomes('foco').join(', '))}</b>${nomes('aux').length ? ` · Auxiliares: ${esc(nomes('aux').join(', '))}` : ''}`;
+  desenhaAtual(ex); desenhaB(ex); desenhaC(ex); midia(ex);
+}
+$('sel-ex').onchange = mostra;
+document.querySelectorAll('[data-tema]').forEach(b => b.onclick = () => {
+  temaB = b.dataset.tema;
+  document.querySelectorAll('[data-tema]').forEach(x => x.classList.toggle('sel', x === b));
+  mostra();
+});
+mostraGrupos();
+preencheSelect('elevacao_lateral');
+</script>
+</body>
+</html>
