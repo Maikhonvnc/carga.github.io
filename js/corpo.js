@@ -80,7 +80,6 @@ function medeCaixas() { // caixa de cada lado do corpo por máscara (coordenadas
 }
 
 function mapaFoco(ex, altura) {
-  if (!caixasReal) medeCaixas();
   const ms = ex.musculos, top = Math.max(...Object.values(ms));
   const nivel = f => f >= 0.4 || f === top ? 'foco' : f >= 0.2 ? 'aux' : 'aux2';
   const partes = ex.foco.filter(id => PARTES[id]);
@@ -92,33 +91,38 @@ function mapaFoco(ex, altura) {
   }
   const ordem = { aux2: 0, aux: 1, foco: 2 }; // foco por cima
   const estilo = { foco: ['#ff1a1a', 0.85], aux: ['#ff4d4d', 0.6], aux2: ['#ff4d4d', 0.35] };
+  for (const v of ['f', 'c']) pecas[v] = pecas[v].sort((a, b) => ordem[a.n] - ordem[b.n]).map(p => ({ ...p, cor: estilo[p.n][0], op: estilo[p.n][1] }));
   const env = Object.keys(ms).filter(m => ms[m] >= 0.15);
   const baixo = env.some(m => MUSC_INF.includes(m)), cima = env.some(m => !MUSC_INF.includes(m) && m !== 'lombar');
   const [fy0, fy1] = !baixo ? [0.04, 0.55] : !cima ? (ms.lombar >= 0.15 ? [0.36, 1] : [0.42, 1]) : [0, 1];
   const W = ANAT_REAL.w, H = ANAT_REAL.h, vb = `${0.14 * W} ${fy0 * H} ${0.72 * W} ${(fy1 - fy0) * H}`;
-  const vista = v => {
-    let defs = '', corpo = '';
-    for (const { mk, frac, n } of pecas[v].sort((a, b) => ordem[a.n] - ordem[b.n])) {
-      let clip = '';
-      if (frac) {
-        const id = 'cf' + (++clipN), [fx0, fx1, y0, y1] = frac;
-        const rects = ['e', 'd'].map(l => {
-          const b = caixasReal[mk.id][l];
-          if (!b) return '';
-          const w = b.x1 - b.x0, h = b.y1 - b.y0;
-          const x = l === 'e' ? b.x0 + fx0 * w : b.x1 - fx1 * w; // "fora" é a esquerda no lado esquerdo e a direita no direito
-          return `<rect x="${x}" y="${b.y0 + y0 * h}" width="${(fx1 - fx0) * w}" height="${(y1 - y0) * h}"/>`;
-        }).join('');
-        defs += `<clipPath id="${id}">${rects}</clipPath>`;
-        clip = ` clip-path="url(#${id})"`;
-      }
-      const [cor, op] = estilo[n];
-      corpo += `<path transform="translate(${mk.o[0] * ANAT_REAL.px2mm} ${mk.o[1] * ANAT_REAL.px2mm})" d="${mk.d}" fill="${cor}" fill-opacity="${op}"${clip}/>`;
+  const st = `height:${altura}px;width:auto`;
+  return `<div class="mapa-foco" aria-hidden="true">${vistaReal('f', pecas.f, vb, st)}${vistaReal('c', pecas.c, vb, st)}</div>`;
+}
+
+// uma vista (f = frente, c = costas) da ilustração com as peças {mk, frac, cor, op, titulo} pintadas por cima
+function vistaReal(v, pecas, vb, estilo) {
+  if (!caixasReal) medeCaixas();
+  let defs = '', corpo = '';
+  for (const { mk, frac, cor, op, titulo } of pecas) {
+    let clip = '';
+    if (frac) {
+      const id = 'cf' + (++clipN), [fx0, fx1, y0, y1] = frac;
+      const rects = ['e', 'd'].map(l => {
+        const b = caixasReal[mk.id][l];
+        if (!b) return '';
+        const w = b.x1 - b.x0, h = b.y1 - b.y0;
+        const x = l === 'e' ? b.x0 + fx0 * w : b.x1 - fx1 * w; // "fora" é a esquerda no lado esquerdo e a direita no direito
+        return `<rect x="${x}" y="${b.y0 + y0 * h}" width="${(fx1 - fx0) * w}" height="${(y1 - y0) * h}"/>`;
+      }).join('');
+      defs += `<clipPath id="${id}">${rects}</clipPath>`;
+      clip = ` clip-path="url(#${id})"`;
     }
-    return `<svg viewBox="${vb}" style="height:${altura}px;width:auto;isolation:isolate">${defs ? `<defs>${defs}</defs>` : ''}
-      <image href="vendor/anatomia/male-${v === 'f' ? 'front' : 'back'}-dark.webp" width="${W}" height="${H}"/><g style="mix-blend-mode:color">${corpo}</g></svg>`;
-  };
-  return `<div class="mapa-foco" aria-hidden="true">${vista('f')}${vista('c')}</div>`;
+    corpo += `<path transform="translate(${mk.o[0] * ANAT_REAL.px2mm} ${mk.o[1] * ANAT_REAL.px2mm})" d="${mk.d}" fill="${cor}" fill-opacity="${op}"${clip}>${titulo ? `<title>${esc(titulo)}</title>` : ''}</path>`;
+  }
+  const W = ANAT_REAL.w, H = ANAT_REAL.h;
+  return `<svg viewBox="${vb}" style="${estilo};isolation:isolate">${defs ? `<defs>${defs}</defs>` : ''}
+    <image href="vendor/anatomia/male-${v === 'f' ? 'front' : 'back'}-dark.webp" width="${W}" height="${H}"/><g style="mix-blend-mode:color">${corpo}</g></svg>`;
 }
 
 // texto do foco: partes (ou músculos inteiros) do alvo principal × auxiliares
@@ -140,15 +144,20 @@ function focoInfo(ex) {
 function renderMusculos() {
   const recup = {};
   MUSCULOS.forEach(m => { recup[m.id] = pctRecuperado(m.id); });
-  const cor = m => { // fadiga (100 − % recuperado) vira intensidade de vermelho — rampa sequencial de um matiz
-    const t = Math.min(1, (100 - recup[m]) / 100 * 1.15);
-    const c = (a, b) => Math.round(a + (b - a) * t);
-    return `rgb(${c(51, 208)},${c(51, 59)},${c(47, 59)})`; // #33332f → #d03b3b
-  };
-  $('mapa-corpo').innerHTML = corpoSvg({
-    cor, titulo: m => `${muscMap[m].nome} — ${recup[m]}% recuperado`,
-    estilo: 'width:100%;max-width:340px;display:block;margin:0 auto',
-  }) + '<div class="escala"><span>descansado</span><div></div><span>fatigado</span></div>';
+  // fadiga (100 − % recuperado) vira intensidade de vermelho sobre a ilustração realista
+  const pecas = { f: [], c: [] };
+  for (const m of MUSCULOS) {
+    const t = Math.min(1, (100 - recup[m.id]) / 100 * 1.15);
+    if (t < 0.05) continue;
+    for (const id of MUSC_REAL[m.id] || []) {
+      const mk = MASK_REAL[id];
+      if (mk) pecas[mk.v].push({ mk, cor: '#ff1a1a', op: +(0.15 + 0.75 * t).toFixed(2), titulo: `${m.nome} — ${recup[m.id]}% recuperado` });
+    }
+  }
+  const W = ANAT_REAL.w, H = ANAT_REAL.h, vb = `${0.14 * W} 0 ${0.72 * W} ${H}`;
+  const st = 'display:block;width:calc(50% - 3px);height:auto;border-radius:10px;background:#111';
+  $('mapa-corpo').innerHTML = `<div class="mapa-fadiga">${vistaReal('f', pecas.f, vb, st)}${vistaReal('c', pecas.c, vb, st)}</div>`
+    + '<div class="escala"><span>descansado</span><div></div><span>fatigado</span></div>';
   const el = $('musculos-grid');
   el.innerHTML = MUSCULOS.map(m => {
     const pct = recup[m.id];
