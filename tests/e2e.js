@@ -52,6 +52,8 @@ async function novaPagina(browser, base, dados) {
     // 2) série cronometrada com esforço → descanso automático
     await pg.click('[data-grupo="Peito"]');
     await pg.click('.mov .chip[data-ex="supino_reto"]');
+    const mapa = await pg.evaluate(() => ({ imgs: document.querySelectorAll('.p-mapa .mapa-foco image').length, acesos: document.querySelectorAll('.p-mapa .mapa-foco path[fill="#ff1a1a"]').length }));
+    ok(mapa.imgs === 2 && mapa.acesos > 0, 'desenho realista acende o foco em vermelho');
     await pg.click('#bt-iniciar');
     await pg.waitForTimeout(1200);
     await pg.click('#bt-parar');

@@ -70,7 +70,6 @@ select{width:100%;margin-top:10px;padding:10px;border-radius:8px;border:1px soli
   <div class="midias">
     <div class="midia"><h3>Foto atual do app</h3><div id="m-atual"></div></div>
     <div class="midia"><h3>Fotos do banco aberto (novas)</h3><div id="m-fe"></div></div>
-    <div class="midia"><h3>GIF animado (teste ExerciseDB)</h3><div id="m-gif"></div></div>
     <div class="midia"><h3>Vídeo de execução</h3><div id="m-video"></div></div>
   </div>
 </div>
@@ -280,32 +279,6 @@ function doisQuadros(el, base) { // alterna _0/_1 como um GIF
   img.onerror = () => { el.innerHTML = '<div class="vazio">Não carregou.</div>'; };
   return setInterval(() => { q = 1 - q; img.src = base(q); }, 750);
 }
-let gifToken = 0;
-async function buscaGif(ex) {
-  const el = $('m-gif'), tk = ++gifToken;
-  if (!ex.fe) { el.innerHTML = '<div class="vazio">Sem nome em inglês para buscar.</div>'; return; }
-  const termo = ex.fe.replace(/_-_/g, ' ').replace(/_/g, ' ').toLowerCase();
-  el.innerHTML = `<div class="vazio">Buscando "${esc(termo)}"…</div>`;
-  const urls = [
-    `https://exercisedb-api.vercel.app/api/v1/exercises/search?q=${encodeURIComponent(termo)}&limit=3`,
-    `https://www.exercisedb.dev/api/v1/exercises/search?q=${encodeURIComponent(termo)}&limit=3`,
-  ];
-  for (const u of urls) {
-    try {
-      const r = await fetch(u);
-      if (!r.ok) continue;
-      const j = await r.json();
-      const lista = Array.isArray(j) ? j : j.data || (j.data && j.data.exercises) || [];
-      const item = (Array.isArray(lista) ? lista : lista.exercises || []).find(x => x && x.gifUrl);
-      if (tk !== gifToken) return;
-      if (item) {
-        el.innerHTML = `<img src="${esc(item.gifUrl)}" alt="" style="background:#fff;object-fit:contain"><p class="mudo" style="margin-top:6px">"${esc(item.name)}" — serviço gratuito da ExerciseDB</p>`;
-        return;
-      }
-    } catch { /* tenta o próximo */ }
-  }
-  if (tk === gifToken) el.innerHTML = '<div class="vazio">O serviço de GIFs não respondeu daqui. Se não funcionar no seu celular, essa opção fica descartada.</div>';
-}
 function midia(ex) {
   clearInterval(animTimer);
   (window.timersMidia || []).forEach(clearInterval);
@@ -315,7 +288,6 @@ function midia(ex) {
   else mA.innerHTML = '<div class="vazio">Sem foto no app — hoje aparece o boneco animado.</div>';
   if (ex.fe) window.timersMidia.push(doisQuadros(mF, q => `${FE(ex.fe)}/${q}.jpg`));
   else mF.innerHTML = '<div class="vazio">O banco aberto não tem esta variação.</div>';
-  buscaGif(ex);
   const q = encodeURIComponent(`${ex.mov.nome} ${ex.v.nome} execução correta`);
   $('m-video').innerHTML = `<div class="vazio">Abre vídeos de execução no YouTube (com o que prestar atenção), já buscando por esta variação.</div>
     <a class="btn" href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">▶ Ver vídeos de execução</a>`;

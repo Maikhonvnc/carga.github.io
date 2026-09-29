@@ -32,39 +32,93 @@ function corpoSvg({ cor, titulo, rotulos = true, estilo = '' }) {
 
 const corpoMini = ms => corpoSvg({ cor: m => ms.includes(m) ? 'var(--azul)' : '#33332f', rotulos: false });
 
-// mapa de foco: frente + costas lado a lado, recortado na região trabalhada. Azul mais forte = mais envolvido;
-// quando o exercício tem uma PARTE definida (ex.: deltoide lateral) o músculo inteiro fica apagado e só ela acende
+// mapa de foco: ilustração realista (frente + costas) com os músculos "acesos" por cima — vermelho forte = foco,
+// vermelho claro = auxiliar. Quando o exercício tem uma PARTE definida (ex.: deltoide lateral) só aquele pedaço acende.
+// Máscaras de vendor/anatomia/realista.js (js-rich-body-highlighter, MIT).
 const MUSC_INF = ['gluteos', 'quadriceps', 'posteriores', 'adutores', 'panturrilha'];
+const MUSC_REAL = {
+  peito: ['pectoralis'], costas: ['lats'], trapezio: ['trapezius', 'upper_back'], ombros: ['deltoids', 'deltoids_back'], biceps: ['biceps'],
+  triceps: ['triceps'], antebraco: ['forearms', 'forearms_back'], abdomen: ['rectus_abdominis', 'obliques'], lombar: ['lower_back'],
+  gluteos: ['glutes'], quadriceps: ['quadriceps'], posteriores: ['hamstrings'], panturrilha: ['calves', 'calves_back'], adutores: [],
+};
+// [máscara, [x0, x1, y0, y1]] — x medido da borda de FORA do corpo (0) até a linha do meio (1); null = máscara inteira
+const PARTE_REAL = {
+  delt_ant: [['deltoids', [0.35, 1, 0, 1]]], delt_lat: [['deltoids', [0, 0.45, 0, 1]], ['deltoids_back', [0, 0.45, 0, 1]]],
+  delt_post: [['deltoids_back', [0.35, 1, 0, 1]]],
+  peito_sup: [['pectoralis', [0, 1, 0, 0.42]]], peito_med: [['pectoralis', [0, 1, 0.3, 0.72]]], peito_inf: [['pectoralis', [0, 1, 0.6, 1]]],
+  dorsal: [['lats', null]], meio_costas: [['upper_back', [0, 1, 0.4, 1]]], trap_sup: [['upper_back', [0, 1, 0, 0.45]], ['trapezius', null]],
+  biceps_longa: [['biceps', [0, 0.5, 0, 1]]], biceps_curta: [['biceps', [0.5, 1, 0, 1]]], braquial: [['biceps', [0, 1, 0.65, 1]], ['forearms', [0, 1, 0, 0.35]]],
+  triceps_longa: [['triceps', [0.5, 1, 0, 1]]], triceps_lat: [['triceps', [0, 0.5, 0, 1]]],
+  antebraco_flex: [['forearms', null]], antebraco_ext: [['forearms_back', null]],
+  gluteo_max: [['glutes', null]], gluteo_med: [['glutes', [0, 0.55, 0, 0.4]]],
+  gastro: [['calves_back', [0, 1, 0, 0.55]]], soleo: [['calves_back', [0, 1, 0.5, 1]]],
+  abd_sup: [['rectus_abdominis', [0, 1, 0, 0.5]]], abd_inf: [['rectus_abdominis', [0, 1, 0.5, 1]]], obliquos: [['obliques', null]],
+};
+const MASK_REAL = Object.fromEntries(ANAT_REAL.masks.map(m => [m.id, m]));
+let caixasReal = null, clipN = 0;
+function medeCaixas() { // caixa de cada lado do corpo por máscara (coordenadas da máscara) — medida uma vez no navegador
+  const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('style', 'position:absolute;left:-9999px;width:1px;height:1px;visibility:hidden');
+  document.body.appendChild(svg);
+  caixasReal = {};
+  for (const m of ANAT_REAL.masks) {
+    const lados = {};
+    for (const sub of m.d.split(/(?=M)/)) {
+      const p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', sub);
+      svg.appendChild(p);
+      const b = p.getBBox();
+      svg.removeChild(p);
+      const lado = b.x + b.width / 2 + m.o[0] * ANAT_REAL.px2mm < ANAT_REAL.w / 2 ? 'e' : 'd';
+      const u = lados[lado];
+      lados[lado] = !u ? { x0: b.x, x1: b.x + b.width, y0: b.y, y1: b.y + b.height }
+        : { x0: Math.min(u.x0, b.x), x1: Math.max(u.x1, b.x + b.width), y0: Math.min(u.y0, b.y), y1: Math.max(u.y1, b.y + b.height) };
+    }
+    caixasReal[m.id] = lados;
+  }
+  svg.remove();
+}
+
 function mapaFoco(ex, altura) {
+  if (!caixasReal) medeCaixas();
   const ms = ex.musculos, top = Math.max(...Object.values(ms));
-  const nivel = f => f >= 0.5 || f >= top * 0.8 ? 1 : f >= 0.2 ? 0.6 : 0.35;
-  const partes = ex.foco.map(id => PARTES[id]).filter(Boolean);
-  const comParte = new Set(partes.flatMap(pt => pt.p.map(pc => pc.m)));
+  const nivel = f => f >= 0.4 || f === top ? 'foco' : f >= 0.2 ? 'aux' : 'aux2';
+  const partes = ex.foco.filter(id => PARTES[id]);
+  const pecas = { f: [], c: [] };
+  for (const [m, f] of Object.entries(ms)) {
+    const n = nivel(f), ps = partes.filter(id => PARTES[id].p[0].m === m);
+    const lista = ps.length ? ps.flatMap(id => PARTE_REAL[id] || []) : (MUSC_REAL[m] || []).map(id => [id, null]);
+    for (const [id, frac] of lista) if (MASK_REAL[id]) pecas[MASK_REAL[id].v].push({ mk: MASK_REAL[id], frac, n });
+  }
+  const ordem = { aux2: 0, aux: 1, foco: 2 }; // foco por cima
+  const estilo = { foco: ['#ff1a1a', 0.85], aux: ['#ff4d4d', 0.6], aux2: ['#ff4d4d', 0.35] };
   const env = Object.keys(ms).filter(m => ms[m] >= 0.15);
   const baixo = env.some(m => MUSC_INF.includes(m)), cima = env.some(m => !MUSC_INF.includes(m) && m !== 'lombar');
-  // recorte: tronco (com braços), só pernas (vistas encostadas, maior) ou corpo inteiro
-  const [y0, h, w, offs, esc2] = !baixo ? [4, 156, 240, [-40, 80], 1] : !cima ? (ms.lombar >= 0.15 ? [118, 188, 136, [-62, -2], 1.4] : [140, 166, 136, [-62, -2], 1.3]) : [4, 304, 240, [-40, 80], 1];
-  const forma = ([tag, at], fill, op) => `<${tag} ${Object.entries(at).map(([k, v]) => `${k}="${v}"`).join(' ')} fill="${fill}"${op < 1 ? ` fill-opacity="${op}"` : ''} stroke="var(--card)" stroke-width="1.5"/>`;
-  const inst = s => s.esp ? [s.forma, espelha(s.forma)] : [s.forma];
-  const recortes = r => { const m = [200 - r[0] - r[2], r[1], r[2], r[3]]; return m[0] === r[0] ? [r] : [r, m]; };
-  let g = '';
-  for (const [vista, dx] of [['f', offs[0]], ['c', offs[1]]]) { // vistas lado a lado (cada uma ocupa x 40–160 no original)
-    g += `<g transform="translate(${dx},0)">`;
-    for (const s of CORPO_SVG[vista]) {
-      const f = s.m ? ms[s.m] || 0 : 0;
-      for (const fo of inst(s)) g += !s.m ? forma(fo, '#262624', 1) : f ? forma(fo, 'var(--azul)', comParte.has(s.m) ? 0.16 : nivel(f)) : forma(fo, '#33332f', 1);
-    }
-    for (const pt of partes) for (const pc of pt.p) {
-      if (pc.v !== vista) continue;
-      const op = Math.max(0.6, nivel(ms[pt.p[0].m] || 0));
-      for (const s of CORPO_SVG[vista].filter(x => x.m === pc.m)) for (const fo of inst(s)) {
-        if (!pc.r) g += forma(fo, 'var(--azul)', op);
-        else for (const r of recortes(pc.r)) g += `<svg x="${r[0]}" y="${r[1]}" width="${r[2]}" height="${r[3]}" viewBox="${r.join(' ')}">${forma(fo, 'var(--azul)', op)}</svg>`;
+  const [fy0, fy1] = !baixo ? [0.04, 0.55] : !cima ? (ms.lombar >= 0.15 ? [0.36, 1] : [0.42, 1]) : [0, 1];
+  const W = ANAT_REAL.w, H = ANAT_REAL.h, vb = `${0.14 * W} ${fy0 * H} ${0.72 * W} ${(fy1 - fy0) * H}`;
+  const vista = v => {
+    let defs = '', corpo = '';
+    for (const { mk, frac, n } of pecas[v].sort((a, b) => ordem[a.n] - ordem[b.n])) {
+      let clip = '';
+      if (frac) {
+        const id = 'cf' + (++clipN), [fx0, fx1, y0, y1] = frac;
+        const rects = ['e', 'd'].map(l => {
+          const b = caixasReal[mk.id][l];
+          if (!b) return '';
+          const w = b.x1 - b.x0, h = b.y1 - b.y0;
+          const x = l === 'e' ? b.x0 + fx0 * w : b.x1 - fx1 * w; // "fora" é a esquerda no lado esquerdo e a direita no direito
+          return `<rect x="${x}" y="${b.y0 + y0 * h}" width="${(fx1 - fx0) * w}" height="${(y1 - y0) * h}"/>`;
+        }).join('');
+        defs += `<clipPath id="${id}">${rects}</clipPath>`;
+        clip = ` clip-path="url(#${id})"`;
       }
+      const [cor, op] = estilo[n];
+      corpo += `<path transform="translate(${mk.o[0] * ANAT_REAL.px2mm} ${mk.o[1] * ANAT_REAL.px2mm})" d="${mk.d}" fill="${cor}" fill-opacity="${op}"${clip}/>`;
     }
-    g += '</g>';
-  }
-  return `<svg class="mapa-foco" viewBox="0 ${y0} ${w} ${h}" style="height:${Math.round(altura * esc2)}px" aria-hidden="true">${g}</svg>`;
+    return `<svg viewBox="${vb}" style="height:${altura}px;width:auto;isolation:isolate">${defs ? `<defs>${defs}</defs>` : ''}
+      <image href="vendor/anatomia/male-${v === 'f' ? 'front' : 'back'}-dark.webp" width="${W}" height="${H}"/><g style="mix-blend-mode:color">${corpo}</g></svg>`;
+  };
+  return `<div class="mapa-foco" aria-hidden="true">${vista('f')}${vista('c')}</div>`;
 }
 
 // texto do foco: partes (ou músculos inteiros) do alvo principal × auxiliares
