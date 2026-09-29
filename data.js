@@ -188,7 +188,8 @@ const GRUPOS = [
 // Por movimento: tipo (composto/isolado → descanso sugerido), foco (PARTES trabalhadas), anim (boneco palito), img (foto padrão),
 // dicas (pontos de atenção na execução), faixa de reps (progressão dupla), seg (reps = segundos).
 // Por variação: eq (equipamento → incremento de carga), img (null = sem foto fiel → boneco), musculos/foco/dica/inc opcionais,
-// fe = id no banco aberto free-exercise-db (fotos da variação quando não há foto local própria).
+// fe = id no banco aberto free-exercise-db (fotos da variação quando não há foto local própria);
+// uni = unilateral (registra repetições de cada lado).
 const MOVIMENTOS = [
   // ---------- Peito ----------
   { id: 'supino_reto', cat: 'Peito', nome: 'Supino reto', tipo: 'composto', foco: ['peito_med', 'delt_ant'], anim: 'press', img: 'supino_reto',
@@ -352,7 +353,7 @@ const MOVIMENTOS = [
     vars: [
       { id: 'remada_baixa', nome: 'Triângulo', fe: 'Seated_Cable_Rows', eq: 'polia' },
       { id: 'remada_baixa_aberta', nome: 'Barra aberta', foco: ['meio_costas'], eq: 'polia', musculos: { costas: .55, trapezio: .25, biceps: .20 } },
-      { id: 'remada_baixa_uni', nome: 'Unilateral', fe: 'Seated_One-arm_Cable_Pulley_Rows', eq: 'polia' },
+      { id: 'remada_baixa_uni', nome: 'Unilateral', uni: true, fe: 'Seated_One-arm_Cable_Pulley_Rows', eq: 'polia' },
     ] },
   { id: 'remada_maquina', cat: 'Costas', sub: 'Dorsais', nome: 'Remada máquina', tipo: 'composto', foco: ['meio_costas', 'dorsal'], anim: 'remada', img: 'remada_maquina',
     musculos: { costas: .65, biceps: .20, trapezio: .15 },
@@ -376,8 +377,8 @@ const MOVIMENTOS = [
       'Desça até alongar bem as costas',
     ],
     vars: [
-      { id: 'serrote', nome: 'Halter', fe: 'One-Arm_Dumbbell_Row', eq: 'halteres' },
-      { id: 'serrote_polia', nome: 'Polia', eq: 'polia', img: null },
+      { id: 'serrote', nome: 'Halter', uni: true, fe: 'One-Arm_Dumbbell_Row', eq: 'halteres' },
+      { id: 'serrote_polia', nome: 'Polia', uni: true, eq: 'polia', img: null },
     ] },
   { id: 'levantamento_terra', cat: 'Costas', sub: 'Lombar', nome: 'Levantamento terra', tipo: 'composto', foco: ['gluteo_max'], anim: 'hinge', img: 'levantamento_terra',
     musculos: { lombar: .25, gluteos: .25, posteriores: .25, costas: .10, trapezio: .10, quadriceps: .05 },
@@ -444,7 +445,7 @@ const MOVIMENTOS = [
     ],
     vars: [
       { id: 'elevacao_lateral', nome: 'Halteres', fe: 'Side_Lateral_Raise', eq: 'halteres', inc: 1 },
-      { id: 'elevacao_lateral_polia', nome: 'Polia (unilateral)', fe: 'Cable_Seated_Lateral_Raise', eq: 'polia', img: null },
+      { id: 'elevacao_lateral_polia', nome: 'Polia (unilateral)', uni: true, fe: 'Cable_Seated_Lateral_Raise', eq: 'polia', img: null },
       { id: 'elevacao_lateral_maq', nome: 'Máquina', eq: 'maquina', img: null },
     ] },
   { id: 'elevacao_frontal', cat: 'Ombros', nome: 'Elevação frontal', tipo: 'isolado', foco: ['delt_ant'], anim: 'elevacao', img: 'elevacao_frontal', faixa: [10, 15],
@@ -521,8 +522,8 @@ const MOVIMENTOS = [
       'Desça devagar até estender o braço',
     ],
     vars: [
-      { id: 'rosca_alternada', nome: 'Em pé', fe: 'Dumbbell_Alternate_Bicep_Curl', eq: 'halteres' },
-      { id: 'rosca_alternada_sent', nome: 'Sentado', fe: 'Seated_Dumbbell_Curl', eq: 'halteres' },
+      { id: 'rosca_alternada', nome: 'Em pé', uni: true, fe: 'Dumbbell_Alternate_Bicep_Curl', eq: 'halteres' },
+      { id: 'rosca_alternada_sent', nome: 'Sentado', uni: true, fe: 'Seated_Dumbbell_Curl', eq: 'halteres' },
       { id: 'rosca_inclinada', nome: 'Banco inclinado', fe: 'Incline_Dumbbell_Curl', foco: ['biceps_longa'], eq: 'halteres', img: null, musculos: { biceps: .90, antebraco: .10 },
         dica: 'Braços pendurados atrás da linha do corpo: alonga mais o bíceps' },
     ] },
@@ -547,7 +548,7 @@ const MOVIMENTOS = [
     vars: [
       { id: 'rosca_scott', nome: 'Barra W', fe: 'Preacher_Curl', eq: 'barra' },
       { id: 'rosca_scott_maq', nome: 'Máquina', fe: 'Machine_Preacher_Curls', eq: 'maquina' },
-      { id: 'rosca_scott_halt', nome: 'Halter (unilateral)', fe: 'One_Arm_Dumbbell_Preacher_Curl', eq: 'halteres' },
+      { id: 'rosca_scott_halt', nome: 'Halter (unilateral)', uni: true, fe: 'One_Arm_Dumbbell_Preacher_Curl', eq: 'halteres' },
     ] },
   { id: 'triceps_pulley', cat: 'Braços', sub: 'Tríceps', nome: 'Tríceps na polia', tipo: 'isolado', foco: ['triceps_lat'], anim: 'triceps', img: 'triceps_pulley',
     musculos: { triceps: .95, antebraco: .05 },
@@ -561,7 +562,7 @@ const MOVIMENTOS = [
       { id: 'triceps_pulley', nome: 'Barra', fe: 'Triceps_Pushdown', eq: 'polia' },
       { id: 'triceps_corda', nome: 'Corda', fe: 'Triceps_Pushdown_-_Rope_Attachment', eq: 'polia', dica: 'Abra a corda para os lados no final do movimento' },
       { id: 'triceps_pulley_inv', nome: 'Pegada invertida', fe: 'Reverse_Grip_Triceps_Pushdown', eq: 'polia' },
-      { id: 'triceps_pulley_uni', nome: 'Unilateral', fe: 'Cable_One_Arm_Tricep_Extension', eq: 'polia' },
+      { id: 'triceps_pulley_uni', nome: 'Unilateral', uni: true, fe: 'Cable_One_Arm_Tricep_Extension', eq: 'polia' },
     ] },
   { id: 'triceps_testa', cat: 'Braços', sub: 'Tríceps', nome: 'Tríceps testa', tipo: 'isolado', foco: ['triceps_longa'], anim: 'triceps', img: 'triceps_testa',
     musculos: { triceps: 1 },
@@ -587,7 +588,7 @@ const MOVIMENTOS = [
     vars: [
       { id: 'triceps_frances', nome: 'Halter (sentado)', fe: 'Seated_Triceps_Press', eq: 'halteres' },
       { id: 'triceps_frances_polia', nome: 'Polia', fe: 'Cable_Rope_Overhead_Triceps_Extension', foco: ['triceps_longa'], eq: 'polia' },
-      { id: 'triceps_frances_uni', nome: 'Unilateral', fe: 'Standing_One-Arm_Dumbbell_Triceps_Extension', eq: 'halteres' },
+      { id: 'triceps_frances_uni', nome: 'Unilateral', uni: true, fe: 'Standing_One-Arm_Dumbbell_Triceps_Extension', eq: 'halteres' },
     ] },
   { id: 'rosca_punho', cat: 'Braços', sub: 'Antebraço', nome: 'Rosca de punho', tipo: 'isolado', foco: ['antebraco_flex'], anim: 'rosca', img: 'rosca_punho', faixa: [12, 20],
     musculos: { antebraco: 1 },
@@ -641,7 +642,7 @@ const MOVIMENTOS = [
     vars: [
       { id: 'leg_press', nome: '45°', fe: 'Leg_Press', eq: 'maquina' },
       { id: 'leg_press_horizontal', nome: 'Horizontal', eq: 'maquina' },
-      { id: 'leg_press_uni', nome: 'Unilateral', eq: 'maquina' },
+      { id: 'leg_press_uni', nome: 'Unilateral', uni: true, eq: 'maquina' },
     ] },
   { id: 'extensora', cat: 'Pernas', sub: 'Quadríceps', nome: 'Cadeira extensora', tipo: 'isolado', anim: 'extensora', img: 'extensora',
     musculos: { quadriceps: 1 },
@@ -653,7 +654,7 @@ const MOVIMENTOS = [
     ],
     vars: [
       { id: 'extensora', nome: 'Bilateral', fe: 'Leg_Extensions', eq: 'maquina' },
-      { id: 'extensora_uni', nome: 'Unilateral', fe: 'Single-Leg_Leg_Extension', eq: 'maquina' },
+      { id: 'extensora_uni', nome: 'Unilateral', uni: true, fe: 'Single-Leg_Leg_Extension', eq: 'maquina' },
     ] },
   { id: 'afundo', cat: 'Pernas', sub: 'Quadríceps', nome: 'Afundo / avanço', tipo: 'composto', foco: ['gluteo_max'], anim: 'afundo', img: 'afundo',
     musculos: { quadriceps: .40, gluteos: .40, posteriores: .15, panturrilha: .05 },
@@ -664,10 +665,10 @@ const MOVIMENTOS = [
       'Joelho de trás desce em direção ao chão, sem bater',
     ],
     vars: [
-      { id: 'afundo', nome: 'Barra', fe: 'Barbell_Lunge', eq: 'barra' },
-      { id: 'afundo_halteres', nome: 'Halteres', fe: 'Dumbbell_Lunges', eq: 'halteres' },
-      { id: 'afundo_smith', nome: 'Smith', eq: 'smith' },
-      { id: 'afundo_andando', nome: 'Passada (andando)', fe: 'Barbell_Walking_Lunge', eq: 'halteres' },
+      { id: 'afundo', nome: 'Barra', uni: true, fe: 'Barbell_Lunge', eq: 'barra' },
+      { id: 'afundo_halteres', nome: 'Halteres', uni: true, fe: 'Dumbbell_Lunges', eq: 'halteres' },
+      { id: 'afundo_smith', nome: 'Smith', uni: true, eq: 'smith' },
+      { id: 'afundo_andando', nome: 'Passada (andando)', uni: true, fe: 'Barbell_Walking_Lunge', eq: 'halteres' },
     ] },
   { id: 'bulgaro', cat: 'Pernas', sub: 'Quadríceps', nome: 'Agachamento búlgaro', tipo: 'composto', foco: ['gluteo_max'], anim: 'afundo', img: 'bulgaro',
     musculos: { quadriceps: .40, gluteos: .40, posteriores: .20 },
@@ -678,9 +679,9 @@ const MOVIMENTOS = [
       'Peso concentrado na perna da frente',
     ],
     vars: [
-      { id: 'bulgaro', nome: 'Barra', fe: 'Split_Squats', eq: 'barra' },
-      { id: 'bulgaro_halteres', nome: 'Halteres', fe: 'Split_Squat_with_Dumbbells', eq: 'halteres' },
-      { id: 'bulgaro_smith', nome: 'Smith', fe: 'Smith_Single-Leg_Split_Squat', eq: 'smith' },
+      { id: 'bulgaro', nome: 'Barra', uni: true, fe: 'Split_Squats', eq: 'barra' },
+      { id: 'bulgaro_halteres', nome: 'Halteres', uni: true, fe: 'Split_Squat_with_Dumbbells', eq: 'halteres' },
+      { id: 'bulgaro_smith', nome: 'Smith', uni: true, fe: 'Smith_Single-Leg_Split_Squat', eq: 'smith' },
     ] },
   { id: 'flexora', cat: 'Pernas', sub: 'Posteriores e glúteos', nome: 'Flexora', tipo: 'isolado', anim: 'flexora', img: 'flexora',
     musculos: { posteriores: .90, panturrilha: .10 },
@@ -693,7 +694,7 @@ const MOVIMENTOS = [
     vars: [
       { id: 'flexora', nome: 'Mesa (deitado)', fe: 'Lying_Leg_Curls', eq: 'maquina' },
       { id: 'flexora_sentada', nome: 'Cadeira (sentado)', fe: 'Seated_Leg_Curl', eq: 'maquina', img: null },
-      { id: 'flexora_pe', nome: 'Em pé (unilateral)', fe: 'Standing_Leg_Curl', eq: 'maquina', img: null },
+      { id: 'flexora_pe', nome: 'Em pé (unilateral)', uni: true, fe: 'Standing_Leg_Curl', eq: 'maquina', img: null },
     ] },
   { id: 'stiff', cat: 'Pernas', sub: 'Posteriores e glúteos', nome: 'Stiff', tipo: 'composto', foco: ['gluteo_max'], anim: 'hinge', img: 'stiff',
     musculos: { posteriores: .50, gluteos: .30, lombar: .20 },
@@ -706,7 +707,7 @@ const MOVIMENTOS = [
     vars: [
       { id: 'stiff', nome: 'Barra', fe: 'Stiff-Legged_Barbell_Deadlift', eq: 'barra' },
       { id: 'stiff_halteres', nome: 'Halteres', fe: 'Stiff-Legged_Dumbbell_Deadlift', eq: 'halteres' },
-      { id: 'stiff_uni', nome: 'Unilateral', fe: 'Kettlebell_One-Legged_Deadlift', eq: 'halteres' },
+      { id: 'stiff_uni', nome: 'Unilateral', uni: true, fe: 'Kettlebell_One-Legged_Deadlift', eq: 'halteres' },
     ] },
   { id: 'elevacao_pelvica', cat: 'Pernas', sub: 'Posteriores e glúteos', nome: 'Elevação pélvica (hip thrust)', tipo: 'composto', foco: ['gluteo_max'], anim: 'hipthrust', img: 'elevacao_pelvica',
     musculos: { gluteos: .70, posteriores: .25, lombar: .05 },
@@ -730,9 +731,9 @@ const MOVIMENTOS = [
       'Segure 1 s apertando o glúteo',
     ],
     vars: [
-      { id: 'coice_polia', nome: 'Polia', fe: 'One-Legged_Cable_Kickback', eq: 'polia' },
-      { id: 'coice_maquina', nome: 'Máquina', eq: 'maquina' },
-      { id: 'coice_4apoios', nome: '4 apoios (caneleira)', fe: 'Glute_Kickback', eq: 'halteres', inc: 1 },
+      { id: 'coice_polia', nome: 'Polia', uni: true, fe: 'One-Legged_Cable_Kickback', eq: 'polia' },
+      { id: 'coice_maquina', nome: 'Máquina', uni: true, eq: 'maquina' },
+      { id: 'coice_4apoios', nome: '4 apoios (caneleira)', uni: true, fe: 'Glute_Kickback', eq: 'halteres', inc: 1 },
     ] },
   { id: 'abdutora', cat: 'Pernas', sub: 'Adutores e abdutores', nome: 'Abdução de quadril', tipo: 'isolado', foco: ['gluteo_med'], anim: 'abducao', img: 'abdutora', faixa: [10, 15],
     musculos: { gluteos: 1 },
@@ -744,7 +745,7 @@ const MOVIMENTOS = [
     ],
     vars: [
       { id: 'abdutora', nome: 'Cadeira abdutora', fe: 'Thigh_Abductor', eq: 'maquina' },
-      { id: 'abdutora_polia', nome: 'Polia (em pé)', eq: 'polia', img: null },
+      { id: 'abdutora_polia', nome: 'Polia (em pé)', uni: true, eq: 'polia', img: null },
     ] },
   { id: 'adutora', cat: 'Pernas', sub: 'Adutores e abdutores', nome: 'Adução de quadril', tipo: 'isolado', anim: 'aducao', img: 'adutora', faixa: [10, 15],
     musculos: { adutores: 1 },
@@ -755,7 +756,7 @@ const MOVIMENTOS = [
     ],
     vars: [
       { id: 'adutora', nome: 'Cadeira adutora', fe: 'Thigh_Adductor', eq: 'maquina' },
-      { id: 'adutora_polia', nome: 'Polia (em pé)', fe: 'Cable_Hip_Adduction', eq: 'polia', img: null },
+      { id: 'adutora_polia', nome: 'Polia (em pé)', uni: true, fe: 'Cable_Hip_Adduction', eq: 'polia', img: null },
     ] },
   { id: 'panturrilha', cat: 'Pernas', sub: 'Panturrilha', nome: 'Panturrilha', tipo: 'isolado', foco: ['gastro'], anim: 'panturrilha', img: 'panturrilha_pe', faixa: [10, 15],
     musculos: { panturrilha: 1 },
@@ -794,7 +795,7 @@ const MOVIMENTOS = [
     ],
     vars: [
       { id: 'prancha', nome: 'Frontal', fe: 'Plank', eq: 'corpo' },
-      { id: 'prancha_lateral', nome: 'Lateral', foco: ['obliquos'], eq: 'corpo', img: null, musculos: { abdomen: .80, gluteos: .10, ombros: .10 } },
+      { id: 'prancha_lateral', nome: 'Lateral', uni: true, foco: ['obliquos'], eq: 'corpo', img: null, musculos: { abdomen: .80, gluteos: .10, ombros: .10 } },
     ] },
   { id: 'elevacao_pernas', cat: 'Core', nome: 'Elevação de pernas', tipo: 'isolado', foco: ['abd_inf'], desc: 60, anim: 'legraise', img: 'elevacao_pernas', faixa: [10, 20],
     musculos: { abdomen: .90, quadriceps: .10 },
