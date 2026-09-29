@@ -142,6 +142,36 @@ const ANIMS = {
 ANIMS.aducao = { chao: 88, A: ANIMS.abducao.B, B: ANIMS.abducao.A };
 
 
+// Partes dos músculos para mostrar *onde* o exercício trabalha (ex.: deltoide lateral vs. posterior).
+// Cada peça redesenha o músculo do mapa corporal recortado pelo retângulo r = [x, y, largura, altura]
+// (lado esquerdo da figura; o recorte é espelhado sozinho). Sem r = músculo inteiro naquela vista.
+// A 1ª peça define o músculo "dono" da parte (usado no texto de foco/auxiliares).
+const PARTES = {
+  delt_ant:       { nome: 'Deltoide anterior', info: 'frente do ombro', p: [{ m: 'ombros', v: 'f', r: [59, 46, 16, 24] }] },
+  delt_lat:       { nome: 'Deltoide lateral', info: 'lado do ombro — é o que dá largura', p: [{ m: 'ombros', v: 'f', r: [50, 46, 9, 24] }, { m: 'ombros', v: 'c', r: [50, 46, 9, 24] }] },
+  delt_post:      { nome: 'Deltoide posterior', info: 'parte de trás do ombro — ajuda na postura', p: [{ m: 'ombros', v: 'c', r: [59, 46, 16, 24] }] },
+  peito_sup:      { nome: 'Peitoral superior', info: 'parte de cima, perto da clavícula', p: [{ m: 'peito', v: 'f', r: [66, 46, 34, 15] }] },
+  peito_med:      { nome: 'Peitoral médio', info: 'o "miolo" do peito (porção esternal)', p: [{ m: 'peito', v: 'f', r: [66, 61, 34, 12] }] },
+  peito_inf:      { nome: 'Peitoral inferior', info: 'parte de baixo do peito', p: [{ m: 'peito', v: 'f', r: [66, 73, 34, 14] }] },
+  dorsal:         { nome: 'Dorsal', info: 'latíssimo — dá a largura das costas (formato em V)', p: [{ m: 'costas', v: 'c', r: [64, 64, 22, 62] }] },
+  meio_costas:    { nome: 'Meio das costas', info: 'romboides e trapézio médio — dão espessura', p: [{ m: 'costas', v: 'c', r: [86, 64, 12, 34] }, { m: 'trapezio', v: 'c', r: [72, 58, 56, 27] }] },
+  trap_sup:       { nome: 'Trapézio superior', info: 'entre o pescoço e o ombro', p: [{ m: 'trapezio', v: 'c', r: [72, 36, 56, 20] }, { m: 'trapezio', v: 'f' }] },
+  biceps_longa:   { nome: 'Bíceps — cabeça longa', info: 'parte de fora do braço, forma o "pico"', p: [{ m: 'biceps', v: 'f', r: [49, 68, 9, 36] }] },
+  biceps_curta:   { nome: 'Bíceps — cabeça curta', info: 'parte de dentro do braço', p: [{ m: 'biceps', v: 'f', r: [58, 68, 9, 36] }] },
+  braquial:       { nome: 'Braquial e braquiorradial', info: 'abaixo do bíceps e topo do antebraço — engrossam o braço', p: [{ m: 'biceps', v: 'f', r: [48, 90, 20, 14] }, { m: 'antebraco', v: 'f', r: [43, 104, 16, 16] }] },
+  triceps_longa:  { nome: 'Tríceps — cabeça longa', info: 'parte de dentro, a maior do tríceps', p: [{ m: 'triceps', v: 'c', r: [58, 68, 9, 36] }] },
+  triceps_lat:    { nome: 'Tríceps — cabeça lateral', info: 'parte de fora, a "ferradura"', p: [{ m: 'triceps', v: 'c', r: [49, 68, 9, 36] }] },
+  antebraco_flex: { nome: 'Flexores do antebraço', info: 'lado da palma da mão', p: [{ m: 'antebraco', v: 'f' }] },
+  antebraco_ext:  { nome: 'Extensores do antebraço', info: 'lado de cima do antebraço', p: [{ m: 'antebraco', v: 'c' }] },
+  gluteo_max:     { nome: 'Glúteo máximo', info: 'o glúteo principal — volume e força do quadril', p: [{ m: 'gluteos', v: 'c' }] },
+  gluteo_med:     { nome: 'Glúteo médio', info: 'parte de cima e de fora do quadril', p: [{ m: 'gluteos', v: 'c', r: [72, 152, 16, 12] }] },
+  gastro:         { nome: 'Gastrocnêmio', info: 'a "batata" da perna — trabalha com o joelho estendido', p: [{ m: 'panturrilha', v: 'c', r: [76, 251, 20, 22] }] },
+  soleo:          { nome: 'Sóleo', info: 'por baixo do gastrocnêmio — trabalha com o joelho dobrado', p: [{ m: 'panturrilha', v: 'c', r: [76, 273, 20, 20] }] },
+  abd_sup:        { nome: 'Abdômen superior', info: 'parte de cima do reto abdominal', p: [{ m: 'abdomen', v: 'f', r: [86, 88, 28, 24] }] },
+  abd_inf:        { nome: 'Abdômen inferior', info: 'parte de baixo do reto abdominal', p: [{ m: 'abdomen', v: 'f', r: [86, 112, 28, 26] }] },
+  obliquos:       { nome: 'Oblíquos', info: 'laterais da cintura', p: [{ m: 'abdomen', v: 'f', r: [86, 90, 7, 48] }] },
+};
+
 // Grupos da tela de treino — escolhe o grupo primeiro, depois o exercício e a variação.
 // `musculos` = o que o grupo trabalha (para mostrar recuperação no botão).
 const GRUPOS = [
@@ -155,12 +185,12 @@ const GRUPOS = [
 
 // Movimentos e suas variações. Cada variação tem histórico próprio: 20 kg no halter ≠ 20 kg na máquina.
 // ids das variações = ids antigos onde já existiam → registros anteriores continuam válidos.
-// Por movimento: tipo (composto/isolado → descanso sugerido), anim (boneco palito), img (foto padrão),
+// Por movimento: tipo (composto/isolado → descanso sugerido), foco (PARTES trabalhadas), anim (boneco palito), img (foto padrão),
 // dicas (pontos de atenção na execução), faixa de reps (progressão dupla), seg (reps = segundos).
-// Por variação: eq (equipamento → incremento de carga), img (null = sem foto fiel → boneco), musculos/dica/inc opcionais.
+// Por variação: eq (equipamento → incremento de carga), img (null = sem foto fiel → boneco), musculos/foco/dica/inc opcionais.
 const MOVIMENTOS = [
   // ---------- Peito ----------
-  { id: 'supino_reto', cat: 'Peito', nome: 'Supino reto', tipo: 'composto', anim: 'press', img: 'supino_reto',
+  { id: 'supino_reto', cat: 'Peito', nome: 'Supino reto', tipo: 'composto', foco: ['peito_med', 'delt_ant'], anim: 'press', img: 'supino_reto',
     musculos: { peito: .60, triceps: .25, ombros: .15 },
     dicas: [
       'Escápulas juntas e para baixo (ombros "no bolso de trás") do início ao fim',
@@ -175,7 +205,7 @@ const MOVIMENTOS = [
       { id: 'supino_reto_maq', nome: 'Máquina', eq: 'maquina', img: null, dica: 'Ajuste o banco para as pegadas ficarem na linha do meio do peito' },
       { id: 'supino_reto_smith', nome: 'Smith', eq: 'smith', dica: 'Posicione o banco para a barra descer na linha do meio do peito' },
     ] },
-  { id: 'supino_inclinado', cat: 'Peito', nome: 'Supino inclinado', tipo: 'composto', anim: 'press', img: 'supino_inclinado',
+  { id: 'supino_inclinado', cat: 'Peito', nome: 'Supino inclinado', tipo: 'composto', foco: ['peito_sup', 'delt_ant'], anim: 'press', img: 'supino_inclinado',
     musculos: { peito: .55, ombros: .25, triceps: .20 },
     dicas: [
       'Banco entre 30° e 45° — mais que isso vira exercício de ombro',
@@ -189,7 +219,7 @@ const MOVIMENTOS = [
       { id: 'supino_inclinado_maq', nome: 'Máquina', eq: 'maquina', img: null },
       { id: 'supino_inclinado_smith', nome: 'Smith', eq: 'smith' },
     ] },
-  { id: 'supino_declinado', cat: 'Peito', nome: 'Supino declinado', tipo: 'composto', anim: 'press', img: 'supino_declinado',
+  { id: 'supino_declinado', cat: 'Peito', nome: 'Supino declinado', tipo: 'composto', foco: ['peito_inf'], anim: 'press', img: 'supino_declinado',
     musculos: { peito: .65, triceps: .25, ombros: .10 },
     dicas: [
       'Prenda bem as pernas no apoio antes de tirar o peso',
@@ -201,7 +231,7 @@ const MOVIMENTOS = [
       { id: 'supino_declinado_halt', nome: 'Halteres', eq: 'halteres' },
       { id: 'supino_declinado_maq', nome: 'Máquina', eq: 'maquina', img: null },
     ] },
-  { id: 'crucifixo', cat: 'Peito', nome: 'Crucifixo', tipo: 'isolado', anim: 'press', img: 'crucifixo',
+  { id: 'crucifixo', cat: 'Peito', nome: 'Crucifixo', tipo: 'isolado', foco: ['peito_med', 'delt_ant'], anim: 'press', img: 'crucifixo',
     musculos: { peito: .85, ombros: .15 },
     dicas: [
       'Cotovelos levemente dobrados e fixos — o movimento é no ombro',
@@ -212,9 +242,9 @@ const MOVIMENTOS = [
     vars: [
       { id: 'crucifixo', nome: 'Peck deck (máquina)', eq: 'maquina' },
       { id: 'crucifixo_halteres', nome: 'Halteres (reto)', eq: 'halteres', img: null },
-      { id: 'crucifixo_inclinado', nome: 'Halteres (inclinado)', eq: 'halteres', img: null },
+      { id: 'crucifixo_inclinado', nome: 'Halteres (inclinado)', foco: ['peito_sup', 'delt_ant'], eq: 'halteres', img: null },
     ] },
-  { id: 'crossover', cat: 'Peito', nome: 'Crossover (polia)', tipo: 'isolado', anim: 'press', img: 'crossover',
+  { id: 'crossover', cat: 'Peito', nome: 'Crossover (polia)', tipo: 'isolado', foco: ['peito_med'], anim: 'press', img: 'crossover',
     musculos: { peito: .85, ombros: .15 },
     dicas: [
       'Um pé à frente e tronco levemente inclinado para estabilizar',
@@ -223,11 +253,11 @@ const MOVIMENTOS = [
       'Volte devagar, sem deixar o cabo puxar o ombro para trás',
     ],
     vars: [
-      { id: 'crossover', nome: 'Polia alta', eq: 'polia', dica: 'De cima para baixo: foco na parte inferior do peito' },
+      { id: 'crossover', nome: 'Polia alta', foco: ['peito_inf'], eq: 'polia', dica: 'De cima para baixo: foco na parte inferior do peito' },
       { id: 'crossover_media', nome: 'Polia média', eq: 'polia' },
-      { id: 'crossover_baixa', nome: 'Polia baixa', eq: 'polia', dica: 'De baixo para cima: foco na parte superior do peito' },
+      { id: 'crossover_baixa', nome: 'Polia baixa', foco: ['peito_sup', 'delt_ant'], eq: 'polia', dica: 'De baixo para cima: foco na parte superior do peito' },
     ] },
-  { id: 'flexao', cat: 'Peito', nome: 'Flexão de braço', tipo: 'composto', anim: 'flexao', img: 'flexao',
+  { id: 'flexao', cat: 'Peito', nome: 'Flexão de braço', tipo: 'composto', foco: ['peito_med', 'delt_ant'], anim: 'flexao', img: 'flexao',
     musculos: { peito: .55, triceps: .25, ombros: .15, abdomen: .05 },
     dicas: [
       'Corpo em linha reta da cabeça aos calcanhares — abdômen e glúteos contraídos',
@@ -238,10 +268,10 @@ const MOVIMENTOS = [
     vars: [
       { id: 'flexao', nome: 'Tradicional', eq: 'corpo' },
       { id: 'flexao_joelhos', nome: 'Joelhos apoiados', eq: 'corpo' },
-      { id: 'flexao_declinada', nome: 'Pés elevados', eq: 'corpo' },
+      { id: 'flexao_declinada', nome: 'Pés elevados', foco: ['peito_sup', 'delt_ant'], eq: 'corpo' },
       { id: 'flexao_diamante', nome: 'Mãos juntas (diamante)', eq: 'corpo', musculos: { triceps: .45, peito: .40, ombros: .15 } },
     ] },
-  { id: 'paralelas', cat: 'Peito', nome: 'Mergulho (paralelas)', tipo: 'composto', anim: 'flexao', img: 'paralelas',
+  { id: 'paralelas', cat: 'Peito', nome: 'Mergulho (paralelas)', tipo: 'composto', foco: ['peito_inf', 'delt_ant'], anim: 'flexao', img: 'paralelas',
     musculos: { triceps: .50, peito: .35, ombros: .15 },
     dicas: [
       'Ombros para baixo, longe das orelhas',
@@ -252,10 +282,10 @@ const MOVIMENTOS = [
     vars: [
       { id: 'paralelas', nome: 'Paralelas', eq: 'corpo' },
       { id: 'paralelas_maq', nome: 'Máquina (sentado)', eq: 'maquina', img: null },
-      { id: 'paralelas_banco', nome: 'No banco', eq: 'corpo', img: null, musculos: { triceps: .70, peito: .15, ombros: .15 },
+      { id: 'paralelas_banco', nome: 'No banco', foco: ['delt_ant'], eq: 'corpo', img: null, musculos: { triceps: .70, peito: .15, ombros: .15 },
         dica: 'Mãos no banco atrás do corpo e costas rente ao banco' },
     ] },
-  { id: 'pullover', cat: 'Peito', nome: 'Pullover', tipo: 'isolado', anim: 'press', img: 'pullover',
+  { id: 'pullover', cat: 'Peito', nome: 'Pullover', tipo: 'isolado', foco: ['dorsal', 'peito_med'], anim: 'press', img: 'pullover',
     musculos: { costas: .45, peito: .40, triceps: .15 },
     dicas: [
       'Cotovelos levemente dobrados e fixos durante todo o movimento',
@@ -270,7 +300,7 @@ const MOVIMENTOS = [
     ] },
 
   // ---------- Costas ----------
-  { id: 'puxada_frontal', cat: 'Costas', sub: 'Dorsais', nome: 'Puxada frontal (pulley)', tipo: 'composto', anim: 'puxada', img: 'puxada_frontal',
+  { id: 'puxada_frontal', cat: 'Costas', sub: 'Dorsais', nome: 'Puxada frontal (pulley)', tipo: 'composto', foco: ['dorsal'], anim: 'puxada', img: 'puxada_frontal',
     musculos: { costas: .65, biceps: .25, ombros: .10 },
     dicas: [
       'Peito para cima e tronco levemente inclinado para trás (~10–20°)',
@@ -284,7 +314,7 @@ const MOVIMENTOS = [
       { id: 'puxada_supinada', nome: 'Supinada', eq: 'polia', musculos: { costas: .55, biceps: .35, ombros: .10 } },
       { id: 'puxada_articulada', nome: 'Máquina articulada', eq: 'maquina', img: null },
     ] },
-  { id: 'barra_fixa', cat: 'Costas', sub: 'Dorsais', nome: 'Barra fixa', tipo: 'composto', anim: 'barrafixa', img: 'barra_fixa',
+  { id: 'barra_fixa', cat: 'Costas', sub: 'Dorsais', nome: 'Barra fixa', tipo: 'composto', foco: ['dorsal'], anim: 'barrafixa', img: 'barra_fixa',
     musculos: { costas: .60, biceps: .25, antebraco: .10, abdomen: .05 },
     dicas: [
       'Comece pendurado com os braços estendidos e os ombros ativos',
@@ -297,7 +327,7 @@ const MOVIMENTOS = [
       { id: 'barra_fixa_supinada', nome: 'Supinada', eq: 'corpo', musculos: { costas: .50, biceps: .35, antebraco: .10, abdomen: .05 } },
       { id: 'barra_fixa_neutra', nome: 'Neutra', eq: 'corpo' },
     ] },
-  { id: 'remada_curvada', cat: 'Costas', sub: 'Dorsais', nome: 'Remada curvada', tipo: 'composto', anim: 'remada', img: 'remada_curvada',
+  { id: 'remada_curvada', cat: 'Costas', sub: 'Dorsais', nome: 'Remada curvada', tipo: 'composto', foco: ['meio_costas', 'dorsal'], anim: 'remada', img: 'remada_curvada',
     musculos: { costas: .55, biceps: .20, trapezio: .15, lombar: .10 },
     dicas: [
       'Tronco inclinado ~45° com a coluna neutra — não arredonde as costas',
@@ -307,10 +337,10 @@ const MOVIMENTOS = [
     ],
     vars: [
       { id: 'remada_curvada', nome: 'Barra pronada', eq: 'barra' },
-      { id: 'remada_curvada_sup', nome: 'Barra supinada', eq: 'barra' },
+      { id: 'remada_curvada_sup', nome: 'Barra supinada', foco: ['dorsal', 'meio_costas'], eq: 'barra' },
       { id: 'remada_cavalinho', nome: 'Cavalinho (T-bar)', eq: 'maquina', img: null },
     ] },
-  { id: 'remada_baixa', cat: 'Costas', sub: 'Dorsais', nome: 'Remada baixa (polia)', tipo: 'composto', anim: 'remada', img: 'remada_baixa',
+  { id: 'remada_baixa', cat: 'Costas', sub: 'Dorsais', nome: 'Remada baixa (polia)', tipo: 'composto', foco: ['meio_costas', 'dorsal'], anim: 'remada', img: 'remada_baixa',
     musculos: { costas: .60, biceps: .25, trapezio: .15 },
     dicas: [
       'Tronco ereto, sem balançar para trás a cada repetição',
@@ -320,10 +350,10 @@ const MOVIMENTOS = [
     ],
     vars: [
       { id: 'remada_baixa', nome: 'Triângulo', eq: 'polia' },
-      { id: 'remada_baixa_aberta', nome: 'Barra aberta', eq: 'polia', musculos: { costas: .55, trapezio: .25, biceps: .20 } },
+      { id: 'remada_baixa_aberta', nome: 'Barra aberta', foco: ['meio_costas'], eq: 'polia', musculos: { costas: .55, trapezio: .25, biceps: .20 } },
       { id: 'remada_baixa_uni', nome: 'Unilateral', eq: 'polia' },
     ] },
-  { id: 'remada_maquina', cat: 'Costas', sub: 'Dorsais', nome: 'Remada máquina', tipo: 'composto', anim: 'remada', img: 'remada_maquina',
+  { id: 'remada_maquina', cat: 'Costas', sub: 'Dorsais', nome: 'Remada máquina', tipo: 'composto', foco: ['meio_costas', 'dorsal'], anim: 'remada', img: 'remada_maquina',
     musculos: { costas: .65, biceps: .20, trapezio: .15 },
     dicas: [
       'Ajuste o banco para as pegadas ficarem na altura do meio do peito',
@@ -334,9 +364,9 @@ const MOVIMENTOS = [
     vars: [
       { id: 'remada_maquina', nome: 'Articulada', eq: 'maquina' },
       { id: 'remada_maquina_neutra', nome: 'Pegada neutra', eq: 'maquina' },
-      { id: 'remada_maquina_aberta', nome: 'Pegada aberta', eq: 'maquina', musculos: { costas: .55, trapezio: .25, biceps: .20 } },
+      { id: 'remada_maquina_aberta', nome: 'Pegada aberta', foco: ['meio_costas'], eq: 'maquina', musculos: { costas: .55, trapezio: .25, biceps: .20 } },
     ] },
-  { id: 'serrote', cat: 'Costas', sub: 'Dorsais', nome: 'Remada unilateral (serrote)', tipo: 'composto', anim: 'remada', img: 'serrote',
+  { id: 'serrote', cat: 'Costas', sub: 'Dorsais', nome: 'Remada unilateral (serrote)', tipo: 'composto', foco: ['dorsal', 'meio_costas'], anim: 'remada', img: 'serrote',
     musculos: { costas: .60, biceps: .20, trapezio: .10, lombar: .10 },
     dicas: [
       'Joelho e mão do mesmo lado no banco, costas paralelas ao chão',
@@ -348,7 +378,7 @@ const MOVIMENTOS = [
       { id: 'serrote', nome: 'Halter', eq: 'halteres' },
       { id: 'serrote_polia', nome: 'Polia', eq: 'polia', img: null },
     ] },
-  { id: 'levantamento_terra', cat: 'Costas', sub: 'Lombar', nome: 'Levantamento terra', tipo: 'composto', anim: 'hinge', img: 'levantamento_terra',
+  { id: 'levantamento_terra', cat: 'Costas', sub: 'Lombar', nome: 'Levantamento terra', tipo: 'composto', foco: ['gluteo_max'], anim: 'hinge', img: 'levantamento_terra',
     musculos: { lombar: .25, gluteos: .25, posteriores: .25, costas: .10, trapezio: .10, quadriceps: .05 },
     dicas: [
       'Barra encostada na canela, sobre o meio do pé',
@@ -362,7 +392,7 @@ const MOVIMENTOS = [
         dica: 'Pés bem afastados com as pontas para fora; mãos por dentro dos joelhos' },
       { id: 'terra_hexagonal', nome: 'Barra hexagonal', eq: 'barra', musculos: { quadriceps: .25, gluteos: .25, posteriores: .20, lombar: .15, trapezio: .15 } },
     ] },
-  { id: 'hiperextensao', cat: 'Costas', sub: 'Lombar', nome: 'Hiperextensão lombar', tipo: 'isolado', anim: 'hinge', img: 'hiperextensao',
+  { id: 'hiperextensao', cat: 'Costas', sub: 'Lombar', nome: 'Hiperextensão lombar', tipo: 'isolado', foco: ['gluteo_max'], anim: 'hinge', img: 'hiperextensao',
     musculos: { lombar: .60, gluteos: .25, posteriores: .15 },
     dicas: [
       'Apoio na altura do quadril, deixando o tronco livre para dobrar',
@@ -374,7 +404,7 @@ const MOVIMENTOS = [
       { id: 'hiperextensao', nome: 'Banco 45°', eq: 'corpo' },
       { id: 'hiperextensao_90', nome: 'Banco romano (90°)', eq: 'corpo' },
     ] },
-  { id: 'encolhimento', cat: 'Costas', sub: 'Trapézio', nome: 'Encolhimento de ombros', tipo: 'isolado', anim: 'encolhe', img: 'encolhimento',
+  { id: 'encolhimento', cat: 'Costas', sub: 'Trapézio', nome: 'Encolhimento de ombros', tipo: 'isolado', foco: ['trap_sup'], anim: 'encolhe', img: 'encolhimento',
     musculos: { trapezio: .90, antebraco: .10 },
     dicas: [
       'Braços estendidos: suba os ombros em direção às orelhas',
@@ -389,7 +419,7 @@ const MOVIMENTOS = [
     ] },
 
   // ---------- Ombros ----------
-  { id: 'desenvolvimento', cat: 'Ombros', nome: 'Desenvolvimento', tipo: 'composto', anim: 'desenv', img: 'desenvolvimento',
+  { id: 'desenvolvimento', cat: 'Ombros', nome: 'Desenvolvimento', tipo: 'composto', foco: ['delt_ant', 'delt_lat'], anim: 'desenv', img: 'desenvolvimento',
     musculos: { ombros: .65, triceps: .25, trapezio: .10 },
     dicas: [
       'Abdômen e glúteos contraídos — não arqueie a lombar',
@@ -403,7 +433,7 @@ const MOVIMENTOS = [
       { id: 'desenv_maquina', nome: 'Máquina', eq: 'maquina', img: 'desenv_maquina', musculos: { ombros: .70, triceps: .25, trapezio: .05 } },
       { id: 'desenv_arnold', nome: 'Arnold', eq: 'halteres', img: null, dica: 'Comece com as palmas viradas para você e gire durante a subida' },
     ] },
-  { id: 'elevacao_lateral', cat: 'Ombros', nome: 'Elevação lateral', tipo: 'isolado', anim: 'elevacao', img: 'elevacao_lateral', faixa: [10, 15],
+  { id: 'elevacao_lateral', cat: 'Ombros', nome: 'Elevação lateral', tipo: 'isolado', foco: ['delt_lat'], anim: 'elevacao', img: 'elevacao_lateral', faixa: [10, 15],
     musculos: { ombros: .90, trapezio: .10 },
     dicas: [
       'Cotovelos levemente dobrados — conduza o movimento pelos cotovelos',
@@ -416,7 +446,7 @@ const MOVIMENTOS = [
       { id: 'elevacao_lateral_polia', nome: 'Polia (unilateral)', eq: 'polia', img: null },
       { id: 'elevacao_lateral_maq', nome: 'Máquina', eq: 'maquina', img: null },
     ] },
-  { id: 'elevacao_frontal', cat: 'Ombros', nome: 'Elevação frontal', tipo: 'isolado', anim: 'elevacao', img: 'elevacao_frontal', faixa: [10, 15],
+  { id: 'elevacao_frontal', cat: 'Ombros', nome: 'Elevação frontal', tipo: 'isolado', foco: ['delt_ant'], anim: 'elevacao', img: 'elevacao_frontal', faixa: [10, 15],
     musculos: { ombros: .90, trapezio: .10 },
     dicas: [
       'Braços quase estendidos; suba no máximo até a altura dos olhos',
@@ -428,7 +458,7 @@ const MOVIMENTOS = [
       { id: 'elevacao_frontal_anilha', nome: 'Anilha', eq: 'halteres' },
       { id: 'elevacao_frontal_polia', nome: 'Polia', eq: 'polia' },
     ] },
-  { id: 'crucifixo_inverso', cat: 'Ombros', nome: 'Crucifixo inverso (posterior)', tipo: 'isolado', anim: 'remada', img: 'crucifixo_inverso', faixa: [10, 15],
+  { id: 'crucifixo_inverso', cat: 'Ombros', nome: 'Crucifixo inverso (posterior)', tipo: 'isolado', foco: ['delt_post', 'meio_costas'], anim: 'remada', img: 'crucifixo_inverso', faixa: [10, 15],
     musculos: { ombros: .60, costas: .20, trapezio: .20 },
     dicas: [
       'Cotovelos levemente dobrados e fixos',
@@ -441,7 +471,7 @@ const MOVIMENTOS = [
       { id: 'crucifixo_inverso_maq', nome: 'Peck deck invertido', eq: 'maquina', img: null },
       { id: 'crucifixo_inverso_polia', nome: 'Polia (cruzada)', eq: 'polia', img: null },
     ] },
-  { id: 'face_pull', cat: 'Ombros', nome: 'Face pull', tipo: 'isolado', faixa: [10, 15],
+  { id: 'face_pull', cat: 'Ombros', nome: 'Face pull', tipo: 'isolado', foco: ['delt_post', 'meio_costas'], faixa: [10, 15],
     musculos: { ombros: .55, trapezio: .30, costas: .15 },
     dicas: [
       'Polia na altura do rosto, polegares da corda apontando para trás',
@@ -452,7 +482,7 @@ const MOVIMENTOS = [
     vars: [
       { id: 'face_pull', nome: 'Corda', eq: 'polia' },
     ] },
-  { id: 'remada_alta', cat: 'Ombros', nome: 'Remada alta', tipo: 'composto', anim: 'remada_alta', img: 'remada_alta',
+  { id: 'remada_alta', cat: 'Ombros', nome: 'Remada alta', tipo: 'composto', foco: ['trap_sup', 'delt_lat'], anim: 'remada_alta', img: 'remada_alta',
     musculos: { trapezio: .50, ombros: .40, biceps: .10 },
     dicas: [
       'Pegada na largura dos ombros ou mais aberta (menos estresse no ombro)',
@@ -492,10 +522,10 @@ const MOVIMENTOS = [
     vars: [
       { id: 'rosca_alternada', nome: 'Em pé', eq: 'halteres' },
       { id: 'rosca_alternada_sent', nome: 'Sentado', eq: 'halteres' },
-      { id: 'rosca_inclinada', nome: 'Banco inclinado', eq: 'halteres', img: null, musculos: { biceps: .90, antebraco: .10 },
+      { id: 'rosca_inclinada', nome: 'Banco inclinado', foco: ['biceps_longa'], eq: 'halteres', img: null, musculos: { biceps: .90, antebraco: .10 },
         dica: 'Braços pendurados atrás da linha do corpo: alonga mais o bíceps' },
     ] },
-  { id: 'rosca_martelo', cat: 'Braços', sub: 'Bíceps', nome: 'Rosca martelo', tipo: 'isolado', anim: 'rosca', img: 'rosca_martelo',
+  { id: 'rosca_martelo', cat: 'Braços', sub: 'Bíceps', nome: 'Rosca martelo', tipo: 'isolado', foco: ['braquial'], anim: 'rosca', img: 'rosca_martelo',
     musculos: { biceps: .60, antebraco: .40 },
     dicas: [
       'Pegada neutra (palmas uma de frente para a outra) o tempo todo',
@@ -506,7 +536,7 @@ const MOVIMENTOS = [
       { id: 'rosca_martelo', nome: 'Halteres', eq: 'halteres' },
       { id: 'rosca_martelo_corda', nome: 'Polia (corda)', eq: 'polia' },
     ] },
-  { id: 'rosca_scott', cat: 'Braços', sub: 'Bíceps', nome: 'Rosca Scott', tipo: 'isolado', anim: 'rosca', img: 'rosca_scott',
+  { id: 'rosca_scott', cat: 'Braços', sub: 'Bíceps', nome: 'Rosca Scott', tipo: 'isolado', foco: ['biceps_curta'], anim: 'rosca', img: 'rosca_scott',
     musculos: { biceps: .90, antebraco: .10 },
     dicas: [
       'Axilas encaixadas no topo do apoio, braço todo apoiado',
@@ -518,7 +548,7 @@ const MOVIMENTOS = [
       { id: 'rosca_scott_maq', nome: 'Máquina', eq: 'maquina' },
       { id: 'rosca_scott_halt', nome: 'Halter (unilateral)', eq: 'halteres' },
     ] },
-  { id: 'triceps_pulley', cat: 'Braços', sub: 'Tríceps', nome: 'Tríceps na polia', tipo: 'isolado', anim: 'triceps', img: 'triceps_pulley',
+  { id: 'triceps_pulley', cat: 'Braços', sub: 'Tríceps', nome: 'Tríceps na polia', tipo: 'isolado', foco: ['triceps_lat'], anim: 'triceps', img: 'triceps_pulley',
     musculos: { triceps: .95, antebraco: .05 },
     dicas: [
       'Cotovelos colados ao corpo e parados',
@@ -532,7 +562,7 @@ const MOVIMENTOS = [
       { id: 'triceps_pulley_inv', nome: 'Pegada invertida', eq: 'polia' },
       { id: 'triceps_pulley_uni', nome: 'Unilateral', eq: 'polia' },
     ] },
-  { id: 'triceps_testa', cat: 'Braços', sub: 'Tríceps', nome: 'Tríceps testa', tipo: 'isolado', anim: 'triceps', img: 'triceps_testa',
+  { id: 'triceps_testa', cat: 'Braços', sub: 'Tríceps', nome: 'Tríceps testa', tipo: 'isolado', foco: ['triceps_longa'], anim: 'triceps', img: 'triceps_testa',
     musculos: { triceps: 1 },
     dicas: [
       'Braços apontando para o teto (ou levemente para trás)',
@@ -545,7 +575,7 @@ const MOVIMENTOS = [
       { id: 'triceps_testa_halt', nome: 'Halteres', eq: 'halteres' },
       { id: 'triceps_testa_polia', nome: 'Polia', eq: 'polia' },
     ] },
-  { id: 'triceps_frances', cat: 'Braços', sub: 'Tríceps', nome: 'Tríceps francês', tipo: 'isolado', anim: 'triceps', img: 'triceps_frances',
+  { id: 'triceps_frances', cat: 'Braços', sub: 'Tríceps', nome: 'Tríceps francês', tipo: 'isolado', foco: ['triceps_longa'], anim: 'triceps', img: 'triceps_frances',
     musculos: { triceps: 1 },
     dicas: [
       'Cotovelos apontando para cima, perto da cabeça',
@@ -555,10 +585,10 @@ const MOVIMENTOS = [
     ],
     vars: [
       { id: 'triceps_frances', nome: 'Halter (sentado)', eq: 'halteres' },
-      { id: 'triceps_frances_polia', nome: 'Polia', eq: 'polia' },
+      { id: 'triceps_frances_polia', nome: 'Polia', foco: ['triceps_longa'], eq: 'polia' },
       { id: 'triceps_frances_uni', nome: 'Unilateral', eq: 'halteres' },
     ] },
-  { id: 'rosca_punho', cat: 'Braços', sub: 'Antebraço', nome: 'Rosca de punho', tipo: 'isolado', anim: 'rosca', img: 'rosca_punho', faixa: [12, 20],
+  { id: 'rosca_punho', cat: 'Braços', sub: 'Antebraço', nome: 'Rosca de punho', tipo: 'isolado', foco: ['antebraco_flex'], anim: 'rosca', img: 'rosca_punho', faixa: [12, 20],
     musculos: { antebraco: 1 },
     dicas: [
       'Antebraços apoiados — só o punho se move',
@@ -567,11 +597,11 @@ const MOVIMENTOS = [
     ],
     vars: [
       { id: 'rosca_punho', nome: 'Flexão (palmas para cima)', eq: 'barra' },
-      { id: 'rosca_punho_inv', nome: 'Extensão (palmas para baixo)', eq: 'barra' },
+      { id: 'rosca_punho_inv', nome: 'Extensão (palmas para baixo)', foco: ['antebraco_ext'], eq: 'barra' },
     ] },
 
   // ---------- Pernas ----------
-  { id: 'agachamento', cat: 'Pernas', sub: 'Quadríceps', nome: 'Agachamento', tipo: 'composto', anim: 'agacha', img: 'agachamento',
+  { id: 'agachamento', cat: 'Pernas', sub: 'Quadríceps', nome: 'Agachamento', tipo: 'composto', foco: ['gluteo_max'], anim: 'agacha', img: 'agachamento',
     musculos: { quadriceps: .45, gluteos: .30, posteriores: .10, lombar: .10, abdomen: .05 },
     dicas: [
       'Pés na largura dos ombros, pontas levemente para fora',
@@ -587,7 +617,7 @@ const MOVIMENTOS = [
       { id: 'agachamento_frontal', nome: 'Frontal', eq: 'barra', img: null, musculos: { quadriceps: .60, gluteos: .20, abdomen: .10, lombar: .10 },
         dica: 'Cotovelos altos e tronco mais ereto' },
     ] },
-  { id: 'hack', cat: 'Pernas', sub: 'Quadríceps', nome: 'Hack squat', tipo: 'composto', anim: 'agacha', img: 'hack',
+  { id: 'hack', cat: 'Pernas', sub: 'Quadríceps', nome: 'Hack squat', tipo: 'composto', foco: ['gluteo_max'], anim: 'agacha', img: 'hack',
     musculos: { quadriceps: .55, gluteos: .25, posteriores: .20 },
     dicas: [
       'Costas e quadril apoiados no encosto o tempo todo',
@@ -599,7 +629,7 @@ const MOVIMENTOS = [
       { id: 'hack', nome: 'Hack', eq: 'maquina' },
       { id: 'hack_pendulo', nome: 'Pêndulo', eq: 'maquina' },
     ] },
-  { id: 'leg_press', cat: 'Pernas', sub: 'Quadríceps', nome: 'Leg press', tipo: 'composto', anim: 'legpress', img: 'leg_press',
+  { id: 'leg_press', cat: 'Pernas', sub: 'Quadríceps', nome: 'Leg press', tipo: 'composto', foco: ['gluteo_max'], anim: 'legpress', img: 'leg_press',
     musculos: { quadriceps: .55, gluteos: .30, posteriores: .15 },
     dicas: [
       'Lombar e quadril colados no encosto — se o quadril descola, diminua a amplitude',
@@ -624,7 +654,7 @@ const MOVIMENTOS = [
       { id: 'extensora', nome: 'Bilateral', eq: 'maquina' },
       { id: 'extensora_uni', nome: 'Unilateral', eq: 'maquina' },
     ] },
-  { id: 'afundo', cat: 'Pernas', sub: 'Quadríceps', nome: 'Afundo / avanço', tipo: 'composto', anim: 'afundo', img: 'afundo',
+  { id: 'afundo', cat: 'Pernas', sub: 'Quadríceps', nome: 'Afundo / avanço', tipo: 'composto', foco: ['gluteo_max'], anim: 'afundo', img: 'afundo',
     musculos: { quadriceps: .40, gluteos: .40, posteriores: .15, panturrilha: .05 },
     dicas: [
       'Passo longo o bastante para os dois joelhos formarem ~90° embaixo',
@@ -638,7 +668,7 @@ const MOVIMENTOS = [
       { id: 'afundo_smith', nome: 'Smith', eq: 'smith' },
       { id: 'afundo_andando', nome: 'Passada (andando)', eq: 'halteres' },
     ] },
-  { id: 'bulgaro', cat: 'Pernas', sub: 'Quadríceps', nome: 'Agachamento búlgaro', tipo: 'composto', anim: 'afundo', img: 'bulgaro',
+  { id: 'bulgaro', cat: 'Pernas', sub: 'Quadríceps', nome: 'Agachamento búlgaro', tipo: 'composto', foco: ['gluteo_max'], anim: 'afundo', img: 'bulgaro',
     musculos: { quadriceps: .40, gluteos: .40, posteriores: .20 },
     dicas: [
       'Pé de trás apoiado no banco, pé da frente bem à frente',
@@ -664,7 +694,7 @@ const MOVIMENTOS = [
       { id: 'flexora_sentada', nome: 'Cadeira (sentado)', eq: 'maquina', img: null },
       { id: 'flexora_pe', nome: 'Em pé (unilateral)', eq: 'maquina', img: null },
     ] },
-  { id: 'stiff', cat: 'Pernas', sub: 'Posteriores e glúteos', nome: 'Stiff', tipo: 'composto', anim: 'hinge', img: 'stiff',
+  { id: 'stiff', cat: 'Pernas', sub: 'Posteriores e glúteos', nome: 'Stiff', tipo: 'composto', foco: ['gluteo_max'], anim: 'hinge', img: 'stiff',
     musculos: { posteriores: .50, gluteos: .30, lombar: .20 },
     dicas: [
       'Joelhos levemente dobrados e fixos',
@@ -677,7 +707,7 @@ const MOVIMENTOS = [
       { id: 'stiff_halteres', nome: 'Halteres', eq: 'halteres' },
       { id: 'stiff_uni', nome: 'Unilateral', eq: 'halteres' },
     ] },
-  { id: 'elevacao_pelvica', cat: 'Pernas', sub: 'Posteriores e glúteos', nome: 'Elevação pélvica (hip thrust)', tipo: 'composto', anim: 'hipthrust', img: 'elevacao_pelvica',
+  { id: 'elevacao_pelvica', cat: 'Pernas', sub: 'Posteriores e glúteos', nome: 'Elevação pélvica (hip thrust)', tipo: 'composto', foco: ['gluteo_max'], anim: 'hipthrust', img: 'elevacao_pelvica',
     musculos: { gluteos: .70, posteriores: .25, lombar: .05 },
     dicas: [
       'Parte de baixo das escápulas apoiada no banco',
@@ -690,7 +720,7 @@ const MOVIMENTOS = [
       { id: 'elevacao_pelvica_maq', nome: 'Máquina', eq: 'maquina', img: null },
       { id: 'elevacao_pelvica_smith', nome: 'Smith', eq: 'smith' },
     ] },
-  { id: 'coice', cat: 'Pernas', sub: 'Posteriores e glúteos', nome: 'Glúteo coice', tipo: 'isolado', faixa: [10, 15],
+  { id: 'coice', cat: 'Pernas', sub: 'Posteriores e glúteos', nome: 'Glúteo coice', tipo: 'isolado', foco: ['gluteo_max'], faixa: [10, 15],
     musculos: { gluteos: .85, posteriores: .15 },
     dicas: [
       'Abdômen contraído — o movimento é só do quadril',
@@ -703,7 +733,7 @@ const MOVIMENTOS = [
       { id: 'coice_maquina', nome: 'Máquina', eq: 'maquina' },
       { id: 'coice_4apoios', nome: '4 apoios (caneleira)', eq: 'halteres', inc: 1 },
     ] },
-  { id: 'abdutora', cat: 'Pernas', sub: 'Adutores e abdutores', nome: 'Abdução de quadril', tipo: 'isolado', anim: 'abducao', img: 'abdutora', faixa: [10, 15],
+  { id: 'abdutora', cat: 'Pernas', sub: 'Adutores e abdutores', nome: 'Abdução de quadril', tipo: 'isolado', foco: ['gluteo_med'], anim: 'abducao', img: 'abdutora', faixa: [10, 15],
     musculos: { gluteos: 1 },
     dicas: [
       'Tronco apoiado (ou inclinado à frente para mais glúteo)',
@@ -726,7 +756,7 @@ const MOVIMENTOS = [
       { id: 'adutora', nome: 'Cadeira adutora', eq: 'maquina' },
       { id: 'adutora_polia', nome: 'Polia (em pé)', eq: 'polia', img: null },
     ] },
-  { id: 'panturrilha', cat: 'Pernas', sub: 'Panturrilha', nome: 'Panturrilha', tipo: 'isolado', anim: 'panturrilha', img: 'panturrilha_pe', faixa: [10, 15],
+  { id: 'panturrilha', cat: 'Pernas', sub: 'Panturrilha', nome: 'Panturrilha', tipo: 'isolado', foco: ['gastro'], anim: 'panturrilha', img: 'panturrilha_pe', faixa: [10, 15],
     musculos: { panturrilha: 1 },
     dicas: [
       'Amplitude total: desça alongando o calcanhar e suba na ponta dos pés',
@@ -735,13 +765,13 @@ const MOVIMENTOS = [
     ],
     vars: [
       { id: 'panturrilha_pe', nome: 'Em pé', eq: 'maquina' },
-      { id: 'panturrilha_sentado', nome: 'Sentado', eq: 'maquina', img: 'panturrilha_sentado', dica: 'Joelho dobrado foca mais o sóleo (parte de baixo)' },
+      { id: 'panturrilha_sentado', nome: 'Sentado', foco: ['soleo'], eq: 'maquina', img: 'panturrilha_sentado', dica: 'Joelho dobrado foca mais o sóleo (parte de baixo)' },
       { id: 'panturrilha_legpress', nome: 'No leg press', eq: 'maquina', img: null },
       { id: 'panturrilha_smith', nome: 'Smith / degrau', eq: 'smith' },
     ] },
 
   // ---------- Core ----------
-  { id: 'abdominal', cat: 'Core', nome: 'Abdominal', tipo: 'isolado', desc: 60, anim: 'crunch', img: 'abdominal', faixa: [12, 20],
+  { id: 'abdominal', cat: 'Core', nome: 'Abdominal', tipo: 'isolado', foco: ['abd_sup'], desc: 60, anim: 'crunch', img: 'abdominal', faixa: [12, 20],
     musculos: { abdomen: 1 },
     dicas: [
       'Enrole a coluna aproximando as costelas do quadril — não puxe o pescoço',
@@ -751,7 +781,7 @@ const MOVIMENTOS = [
     vars: [
       { id: 'abdominal', nome: 'Crunch (solo)', eq: 'corpo' },
       { id: 'abdominal_maq', nome: 'Máquina', eq: 'maquina', img: null },
-      { id: 'abdominal_polia', nome: 'Polia (ajoelhado)', eq: 'polia', img: null },
+      { id: 'abdominal_polia', nome: 'Polia (ajoelhado)', foco: ['abd_sup', 'abd_inf'], eq: 'polia', img: null },
     ] },
   { id: 'prancha', cat: 'Core', nome: 'Prancha', tipo: 'isolado', desc: 60, anim: 'prancha', img: 'prancha', seg: true,
     musculos: { abdomen: .70, lombar: .20, ombros: .10 },
@@ -763,9 +793,9 @@ const MOVIMENTOS = [
     ],
     vars: [
       { id: 'prancha', nome: 'Frontal', eq: 'corpo' },
-      { id: 'prancha_lateral', nome: 'Lateral', eq: 'corpo', img: null, musculos: { abdomen: .80, gluteos: .10, ombros: .10 } },
+      { id: 'prancha_lateral', nome: 'Lateral', foco: ['obliquos'], eq: 'corpo', img: null, musculos: { abdomen: .80, gluteos: .10, ombros: .10 } },
     ] },
-  { id: 'elevacao_pernas', cat: 'Core', nome: 'Elevação de pernas', tipo: 'isolado', desc: 60, anim: 'legraise', img: 'elevacao_pernas', faixa: [10, 20],
+  { id: 'elevacao_pernas', cat: 'Core', nome: 'Elevação de pernas', tipo: 'isolado', foco: ['abd_inf'], desc: 60, anim: 'legraise', img: 'elevacao_pernas', faixa: [10, 20],
     musculos: { abdomen: .90, quadriceps: .10 },
     dicas: [
       'Lombar colada no apoio — se descolar, reduza a amplitude',

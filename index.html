@@ -77,6 +77,7 @@ nav button.ativo{color:var(--azul)}
 .chip.feito{opacity:.55}
 .chip.hoje{border-color:rgba(12,163,12,.6)}
 .chip.sel{border-color:var(--azul);background:rgba(57,135,229,.16)}
+.seg.vista{margin:0 0 6px}
 .chip-mais{color:var(--azul);padding:8px 11px}
 .grupo-sug{margin-bottom:10px}
 .grupo-sug .titulo{font-size:.8rem;color:var(--ink2);margin-bottom:6px}
@@ -129,6 +130,36 @@ li.reg .det{color:var(--mudo);font-size:.8rem;margin-top:2px}
 .mov-cab .mudo{font-size:.75rem;white-space:nowrap}
 .mov-musc{font-size:.75rem;color:var(--mudo);margin:2px 0 8px}
 .aviso{color:var(--atencao)}
+.mov-top{display:flex;gap:10px;align-items:center;margin-bottom:8px}
+.mov-mapa{flex:0 0 106px;display:flex;justify-content:center}
+.mov-txt{flex:1;min-width:0}
+.mov-foco{font-size:.78rem;color:var(--ink2);margin-top:3px;line-height:1.35}
+.mov-foco b{color:var(--azul);font-weight:600}
+.mov-txt .mov-musc{margin:2px 0 0}
+.mapa-foco{display:block;width:auto;max-width:100%}
+.p-mapa{flex:1;min-width:0;display:flex;justify-content:center}
+.p-foco{margin-top:10px;font-size:.82rem;color:var(--ink2);line-height:1.45}
+.p-foco .it{display:flex;gap:8px;align-items:baseline}
+.p-foco .it::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:var(--azul);transform:translateY(-1px)}
+.p-foco .it b{color:var(--ink)}
+.p-foco .aux{color:var(--mudo);margin-top:3px}
+.t-sobe{color:var(--bom);font-weight:600}.t-desce{color:var(--serio);font-weight:600}.t-igual{color:var(--mudo)}
+details.hist{margin-top:10px;border:1px solid var(--borda);border-radius:10px;padding:9px 12px}
+details.hist summary{cursor:pointer;font-weight:600;font-size:.88rem}
+.evo-item{border-bottom:1px solid var(--borda)}
+.evo-item:last-child{border-bottom:none}
+.evo-cab{
+  display:flex;align-items:center;gap:10px;width:100%;background:none;color:var(--ink);
+  text-align:left;padding:10px 0;font-weight:400;border-radius:0;
+}
+.evo-info{flex:1;min-width:0}
+.evo-nome{font-weight:600;font-size:.9rem}
+.evo-info .det{font-size:.75rem;color:var(--mudo);margin-top:2px}
+.evo-t{flex:0 0 74px;text-align:right;font-size:.78rem}
+.spark{flex:none}
+.evo-det{padding:2px 0 14px}
+.evo-item.aberto .evo-cab{padding-bottom:4px}
+.evo-det h3,.hist h3{font-size:.85rem;margin:12px 0 4px;color:var(--ink2)}
 
 .p-titulo{margin:0 0 8px}
 .p-vars{margin-bottom:12px}
@@ -203,7 +234,7 @@ li.serie .bt-ok{padding:6px 10px;font-size:.85rem;margin-left:4px}
 .desc-pre{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:14px;font-size:.78rem;color:var(--mudo)}
 .desc-pre button{background:var(--pagina);border:1px solid var(--borda);color:var(--ink2);padding:5px 10px;font-size:.78rem;border-radius:999px;font-weight:500}
 .desc-pre button.sel{border-color:var(--azul);color:var(--azul)}
-.em-serie .nav-treino,.em-serie .p-vars,.em-serie .dicas,.em-serie .fotos-maq,.em-serie .desc-pre,.em-serie #p-fim{display:none}
+.em-serie .nav-treino,.em-serie .p-vars,.em-serie .dicas,.em-serie .fotos-maq,.em-serie .desc-pre,.em-serie #p-fim,.em-serie .hist,.em-serie .p-foco{display:none}
 
 /* barra fixa de descanso / série em andamento */
 #barra-treino{
@@ -323,15 +354,9 @@ body.com-barra #toast{bottom:146px}
 <section id="tab-progresso" hidden>
   <div class="tiles" id="tiles-gerais"></div>
   <div class="card">
-    <h3>📈 Progressão por exercício</h3>
-    <select id="sel-progresso"></select>
-    <div class="tiles" id="tiles-ex" style="margin-top:12px"></div>
-    <h3 style="margin-top:6px" id="tit-graf1">Força estimada (e1RM, kg)</h3>
-    <div class="grafico" id="graf-e1rm"></div>
-    <h3 style="margin-top:14px" id="tit-graf2">Volume por treino (kg)</h3>
-    <div class="grafico" id="graf-volume"></div>
-    <h3 style="margin-top:14px">Últimas sessões</h3>
-    <div id="hist-sessoes"></div>
+    <h3>📈 Evolução por grupo</h3>
+    <div class="chips" id="prog-grupos"></div>
+    <div id="prog-evo" style="margin-top:14px"></div>
   </div>
 </section>
 

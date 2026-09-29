@@ -80,7 +80,7 @@ function montaCatalogo() {
   EXERCICIOS = movs.flatMap(m => m.vars.map(v => ({
     id: v.id, mov: m.id, cat: m.cat, vnome: v.nome,
     nome: m.vars.length > 1 ? `${m.nome} · ${v.nome}` : m.nome,
-    musculos: v.musculos || m.musculos,
+    musculos: v.musculos || m.musculos, foco: v.foco || m.foco || [],
     anim: m.anim, img: 'img' in v ? v.img : m.img,
     dicas: [...(m.dicas || []), ...(v.dica ? [v.dica] : [])],
     inc: v.inc || INC_EQ[v.eq] || 2.5, corpo: v.eq === 'corpo', seg: !!m.seg,
@@ -248,7 +248,7 @@ const rolarPara = (id, block = 'start') => { const el = $(id); if (el) el.scroll
 
 // ---------- aba Treino ----------
 // fluxo: grupo → exercício/variação → painel de execução (séries cronometradas + esforço + descanso)
-const ATIVO_PADRAO = { grupo: null, ex: null, rotina: null, estado: 'pronto', serieIni: 0, pend: null, descFim: 0, descDur: 0, descAvisado: false, ts: 0 };
+const ATIVO_PADRAO = { grupo: null, vista: 'ex', ex: null, rotina: null, estado: 'pronto', serieIni: 0, pend: null, descFim: 0, descDur: 0, descAvisado: false, ts: 0 };
 let ativo = Object.assign({}, ATIVO_PADRAO, lerLS(LS_ATIVO, {}));
 const salvaAtivo = () => { ativo.ts = Date.now(); localStorage.setItem(LS_ATIVO, JSON.stringify(ativo)); };
 const emSerie = () => ativo.estado === 'contagem' || ativo.estado === 'rodando' || ativo.estado === 'anotando';
@@ -366,6 +366,14 @@ function renderGrupos(el) {
 function renderListaGrupo(el) {
   const lista = movs.filter(m => m.cat === ativo.grupo);
   if (!lista.length) { ativo.grupo = null; return renderGrupos(el); }
+  el.innerHTML = `<div class="nav-treino"><button class="voltar" id="bt-voltar">‹ Grupos</button><h3>${esc(nomeGrupo(ativo.grupo))}</h3></div>
+    <div class="seg vista"><button data-vista="ex" class="${ativo.vista !== 'evo' ? 'ativo' : ''}">🏋️ Exercícios</button><button data-vista="evo" class="${ativo.vista === 'evo' ? 'ativo' : ''}">📈 Evolução</button></div>
+    <div id="grupo-corpo"></div>`;
+  $('bt-voltar').onclick = () => { ativo.grupo = null; salvaAtivo(); renderTreinar(); };
+  el.querySelectorAll('[data-vista]').forEach(b => b.onclick = () => { ativo.vista = b.dataset.vista; salvaAtivo(); renderListaGrupo(el); });
+  const corpo = $('grupo-corpo');
+  if (ativo.vista === 'evo') return renderEvolucao(corpo, ativo.grupo);
+
   const recup = {};
   MUSCULOS.forEach(m => { recup[m.id] = pctRecuperado(m.id); });
   const hoje = hojeKey();
@@ -374,8 +382,7 @@ function renderListaGrupo(el) {
     if (!ultimo[l.ex] || l.ts > ultimo[l.ex].ts) ultimo[l.ex] = l;
     if (dayKey(l.ts) === hoje) feitosHoje.add(l.ex);
   }
-  let html = `<div class="nav-treino"><button class="voltar" id="bt-voltar">‹ Grupos</button><h3>${esc(nomeGrupo(ativo.grupo))}</h3></div>
-    <p class="mudo" style="margin-bottom:4px">Toque na variação que vai usar — cada uma guarda sua própria carga.</p>`;
+  let html = '<p class="mudo" style="margin:6px 0 4px">O desenho mostra a parte do músculo que cada exercício trabalha. Toque na variação que vai usar — cada uma guarda sua própria carga.</p>';
   let subAtual;
   const temSub = lista.some(m => m.sub);
   for (const m of lista) {
@@ -383,12 +390,20 @@ function renderListaGrupo(el) {
     if (sub && sub !== subAtual) html += `<div class="sub">${esc(sub)}</div>`;
     subAtual = sub;
     const vars = m.vars.map(v => exMap[v.id]);
-    const ult = Math.max(0, ...vars.map(v => ultimo[v.id] ? ultimo[v.id].ts : 0));
-    const princ = Object.entries(m.musculos).sort((a, b) => b[1] - a[1]).filter(([, f]) => f >= 0.15);
-    const alerta = princ.filter(([id, f]) => f >= 0.5 && recup[id] < 60).map(([id]) => `${nomeCurto(id)} ${recup[id]}%`);
+    const recente = vars.filter(v => ultimo[v.id]).sort((a, b) => ultimo[b.id].ts - ultimo[a.id].ts)[0];
+    const ult = recente ? ultimo[recente.id].ts : 0;
+    const tend = recente ? setaTend(tendencia(pontosEx(recente.id).pts)) : '';
+    const fi = focoInfo({ musculos: m.musculos, foco: m.foco || [] });
+    const alerta = Object.entries(m.musculos).filter(([id, f]) => f >= 0.5 && recup[id] < 60).map(([id]) => `${nomeCurto(id)} ${recup[id]}%`);
     html += `<div class="mov">
-      <div class="mov-cab"><span class="mov-nome">${esc(m.nome)}</span>${ult ? `<span class="mudo">${quando(ult)}</span>` : ''}</div>
-      <div class="mov-musc">${princ.map(([id]) => esc(nomeCurto(id))).join(' · ')}${alerta.length ? ` <span class="aviso">· ⚠️ ${esc(alerta.join(', '))}</span>` : ''}</div>
+      <div class="mov-top">
+        <div class="mov-mapa">${mapaFoco({ musculos: m.musculos, foco: m.foco || [] }, 68)}</div>
+        <div class="mov-txt">
+          <div class="mov-cab"><span class="mov-nome">${esc(m.nome)}</span>${ult ? `<span class="mudo">${quando(ult)}</span>` : ''}</div>
+          <div class="mov-foco">Foco: <b>${esc(fi.foco.map(x => x.nome).join(', '))}</b></div>
+          <div class="mov-musc">${fi.aux.length ? 'Auxiliares: ' + esc(fi.aux.map(x => x.nome).join(', ')) : ''}${tend ? `${fi.aux.length ? ' · ' : ''}${tend}` : ''}${alerta.length ? ` <span class="aviso">· ⚠️ ${esc(alerta.join(', '))}</span>` : ''}</div>
+        </div>
+      </div>
       <div class="chips">${vars.map(v => {
         const u = ultimo[v.id], feito = feitosHoje.has(v.id);
         const top = u && melhorSerie(u.sets);
@@ -397,10 +412,9 @@ function renderListaGrupo(el) {
       }).join('')}<button class="chip chip-mais" data-novavar="${m.id}" aria-label="Adicionar variação de ${esc(m.nome)}">＋</button></div>
     </div>`;
   }
-  el.innerHTML = html;
-  $('bt-voltar').onclick = () => { ativo.grupo = null; salvaAtivo(); renderTreinar(); };
-  bindChips(el);
-  el.querySelectorAll('[data-novavar]').forEach(b => b.onclick = () => novaVariacao(b.dataset.novavar));
+  corpo.innerHTML = html;
+  bindChips(corpo);
+  corpo.querySelectorAll('[data-novavar]').forEach(b => b.onclick = () => novaVariacao(b.dataset.novavar));
 }
 
 function abrirExercicio(exId, rotinaId) {
@@ -443,7 +457,7 @@ function novaVariacao(movId) {
 function renderPainel(el) {
   const ex = exMap[ativo.ex], mov = movMap[ex.mov];
   if (form.ex !== ex.id) preencheForm(ex);
-  const musc = Object.entries(ex.musculos).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  const fi = focoInfo(ex);
   el.innerHTML = `
     <div class="nav-treino"><button class="voltar" id="bt-voltar">‹ ${esc(nomeGrupo(ex.cat))}</button></div>
     <h2 class="p-titulo">${esc(mov.nome)}</h2>
@@ -452,14 +466,16 @@ function renderPainel(el) {
       <button class="chip chip-mais" data-novavar="${mov.id}">＋ variação</button></div>
     <div class="midia">
       <div id="anim-ex" hidden></div>
-      <div class="p-musc">${musc.map(([id, f]) => `<div class="p-m">${esc(nomeCurto(id))}
-        <div class="barra"><div style="width:${Math.round(f * 100)}%;background:var(--azul)"></div></div></div>`).join('')}</div>
+      <div class="p-mapa">${mapaFoco(ex, 100)}</div>
     </div>
+    <div class="p-foco">${fi.foco.map(x => `<div class="it"><span><b>${esc(x.nome)}</b>${x.info ? ` — ${esc(x.info)}` : ''}</span></div>`).join('')}
+      ${fi.aux.length ? `<div class="aux">Auxiliares: ${esc(fi.aux.map(x => x.nome).join(', '))}</div>` : ''}</div>
     <div class="fotos-maq" id="fotos-maq"></div>
     ${ex.dicas.length ? `<details class="dicas" id="dicas"${prefs.dicasFechadas ? '' : ' open'}><summary>🎯 Pontos de atenção</summary>
       <ul>${ex.dicas.map(d => `<li>${esc(d)}</li>`).join('')}</ul></details>` : ''}
     <div id="nota"></div>
     <p class="ref" id="ref"></p>
+    <details class="hist" id="hist"><summary>📈 Histórico e evolução desta variação</summary><div id="hist-corpo"></div></details>
     <ul id="series"></ul>
     <div id="esforco"></div>
     <div class="ctl" id="ctl"></div>
@@ -469,6 +485,7 @@ function renderPainel(el) {
   el.querySelectorAll('[data-var]').forEach(b => b.onclick = () => abrirExercicio(b.dataset.var));
   el.querySelector('[data-novavar]').onclick = () => novaVariacao(mov.id);
   if ($('dicas')) $('dicas').ontoggle = () => { prefs.dicasFechadas = !$('dicas').open; salvarPrefs(); };
+  $('hist').ontoggle = () => { if ($('hist').open) detalheExercicio($('hist-corpo'), ex.id, false); }; // gráfico precisa da largura visível
   mostraAnim(ex.id);
   renderFotosPainel();
   renderNota();
@@ -1149,14 +1166,15 @@ async function atualizaTela() {
 
 // ---------- aba Músculos ----------
 // mapa corporal 2D reaproveitado: grande (fadiga em vermelho) e mini (músculos do grupo em azul)
+const espelha = ([tag, at]) => { // forma do lado esquerdo → lado direito (eixo x = 100)
+  const a = { ...at };
+  if (tag === 'ellipse') a.cx = 200 - a.cx;
+  else if (tag === 'rect') a.x = 200 - a.x - a.width;
+  else a.d = a.d.replace(/(-?[\d.]+),(-?[\d.]+)/g, (s, x, y) => `${200 - parseFloat(x)},${y}`);
+  return [tag, a];
+};
+
 function corpoSvg({ cor, titulo, rotulos = true, estilo = '' }) {
-  const espelha = ([tag, at]) => {
-    const a = { ...at };
-    if (tag === 'ellipse') a.cx = 200 - a.cx;
-    else if (tag === 'rect') a.x = 200 - a.x - a.width;
-    else a.d = a.d.replace(/(-?[\d.]+),(-?[\d.]+)/g, (s, x, y) => `${200 - parseFloat(x)},${y}`);
-    return [tag, a];
-  };
   const el = ([tag, at], m) => {
     const attrs = Object.entries(at).map(([k, v]) => `${k}="${v}"`).join(' ');
     const t = m && titulo ? `<title>${esc(titulo(m))}</title>` : '';
@@ -1176,6 +1194,57 @@ function corpoSvg({ cor, titulo, rotulos = true, estilo = '' }) {
 }
 
 const corpoMini = ms => corpoSvg({ cor: m => ms.includes(m) ? 'var(--azul)' : '#33332f', rotulos: false });
+
+// mapa de foco: frente + costas lado a lado, recortado na região trabalhada. Azul mais forte = mais envolvido;
+// quando o exercício tem uma PARTE definida (ex.: deltoide lateral) o músculo inteiro fica apagado e só ela acende
+const MUSC_INF = ['gluteos', 'quadriceps', 'posteriores', 'adutores', 'panturrilha'];
+function mapaFoco(ex, altura) {
+  const ms = ex.musculos, top = Math.max(...Object.values(ms));
+  const nivel = f => f >= 0.5 || f >= top * 0.8 ? 1 : f >= 0.2 ? 0.6 : 0.35;
+  const partes = ex.foco.map(id => PARTES[id]).filter(Boolean);
+  const comParte = new Set(partes.flatMap(pt => pt.p.map(pc => pc.m)));
+  const env = Object.keys(ms).filter(m => ms[m] >= 0.15);
+  const baixo = env.some(m => MUSC_INF.includes(m)), cima = env.some(m => !MUSC_INF.includes(m) && m !== 'lombar');
+  // recorte: tronco (com braços), só pernas (vistas encostadas, maior) ou corpo inteiro
+  const [y0, h, w, offs, esc2] = !baixo ? [4, 156, 240, [-40, 80], 1] : !cima ? (ms.lombar >= 0.15 ? [118, 188, 136, [-62, -2], 1.4] : [140, 166, 136, [-62, -2], 1.3]) : [4, 304, 240, [-40, 80], 1];
+  const forma = ([tag, at], fill, op) => `<${tag} ${Object.entries(at).map(([k, v]) => `${k}="${v}"`).join(' ')} fill="${fill}"${op < 1 ? ` fill-opacity="${op}"` : ''} stroke="var(--card)" stroke-width="1.5"/>`;
+  const inst = s => s.esp ? [s.forma, espelha(s.forma)] : [s.forma];
+  const recortes = r => { const m = [200 - r[0] - r[2], r[1], r[2], r[3]]; return m[0] === r[0] ? [r] : [r, m]; };
+  let g = '';
+  for (const [vista, dx] of [['f', offs[0]], ['c', offs[1]]]) { // vistas lado a lado (cada uma ocupa x 40–160 no original)
+    g += `<g transform="translate(${dx},0)">`;
+    for (const s of CORPO_SVG[vista]) {
+      const f = s.m ? ms[s.m] || 0 : 0;
+      for (const fo of inst(s)) g += !s.m ? forma(fo, '#262624', 1) : f ? forma(fo, 'var(--azul)', comParte.has(s.m) ? 0.16 : nivel(f)) : forma(fo, '#33332f', 1);
+    }
+    for (const pt of partes) for (const pc of pt.p) {
+      if (pc.v !== vista) continue;
+      const op = Math.max(0.6, nivel(ms[pt.p[0].m] || 0));
+      for (const s of CORPO_SVG[vista].filter(x => x.m === pc.m)) for (const fo of inst(s)) {
+        if (!pc.r) g += forma(fo, 'var(--azul)', op);
+        else for (const r of recortes(pc.r)) g += `<svg x="${r[0]}" y="${r[1]}" width="${r[2]}" height="${r[3]}" viewBox="${r.join(' ')}">${forma(fo, 'var(--azul)', op)}</svg>`;
+      }
+    }
+    g += '</g>';
+  }
+  return `<svg class="mapa-foco" viewBox="0 ${y0} ${w} ${h}" style="height:${Math.round(altura * esc2)}px" aria-hidden="true">${g}</svg>`;
+}
+
+// texto do foco: partes (ou músculos inteiros) do alvo principal × auxiliares
+function focoInfo(ex) {
+  const ms = Object.entries(ex.musculos).filter(([, f]) => f >= 0.15).sort((a, b) => b[1] - a[1]);
+  const top = ms.length ? ms[0][1] : 0;
+  const foco = [], aux = [];
+  const partes = ex.foco.filter(id => PARTES[id]).map(id => PARTES[id]);
+  const cobertos = new Set(partes.flatMap(pt => pt.p.slice(1).map(pc => pc.m))); // ex.: braquial já inclui o antebraço
+  for (const [m, f] of ms) {
+    const ps = partes.filter(pt => pt.p[0].m === m);
+    if (!ps.length && cobertos.has(m)) continue;
+    const itens = ps.length ? ps.map(pt => ({ nome: pt.nome, info: pt.info })) : [{ nome: nomeCurto(m) }];
+    (f >= 0.4 || f === top ? foco : aux).push(...itens);
+  }
+  return { foco, aux };
+}
 
 function renderMusculos() {
   const recup = {};
@@ -1235,60 +1304,135 @@ function seriesPorDia(exId) {
   return Object.keys(porDia).sort().map(k => ({ x: new Date(k + 'T12:00').getTime(), ...porDia[k] }));
 }
 
+// pontos por sessão de uma variação: e1RM, ou a melhor série quando é peso corporal
+function pontosEx(exId) {
+  const pts = seriesPorDia(exId);
+  const corporal = pts.every(p => !p.e1);
+  return { corporal, pts: pts.map(p => ({ x: p.x, y: corporal ? p.reps : p.e1 })) };
+}
+
+// variação % entre a 1ª sessão dos últimos 60 dias (ou das últimas 8) e a mais recente
+function tendencia(pts) {
+  if (pts.length < 2) return null;
+  const janela = pts.filter(p => p.x >= Date.now() - 60 * 864e5);
+  const base = (janela.length >= 2 ? janela : pts.slice(-8))[0], ult = pts[pts.length - 1];
+  return base.y && base !== ult ? Math.round((ult.y / base.y - 1) * 100) : null;
+}
+const setaTend = t => t == null ? '' : t >= 2 ? `<span class="t-sobe">↗ +${t}%</span>`
+  : t <= -2 ? `<span class="t-desce">↘ −${-t}%</span>` : '<span class="t-igual">→ estável</span>';
+
+function sparkline(pts) {
+  const p = pts.slice(-12);
+  if (p.length < 2) return '<svg class="spark" width="72" height="22"></svg>';
+  const W = 72, H = 22, ys = p.map(q => q.y), y0 = Math.min(...ys), dy = Math.max(...ys) - y0 || 1;
+  const X = i => 3 + i / (p.length - 1) * (W - 6), Y = v => H - 4 - (v - y0) / dy * (H - 8);
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">
+    <path d="${p.map((q, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(q.y).toFixed(1)}`).join('')}" fill="none" stroke="var(--azul)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${X(p.length - 1).toFixed(1)}" cy="${Y(p[p.length - 1].y).toFixed(1)}" r="2.6" fill="var(--azul)"/></svg>`;
+}
+
+// séries por semana (8 semanas) de um grupo — barras; a semana atual fica mais clara (ainda em andamento)
+function graficoSemanas(el, grupo) {
+  const hoje = new Date(semanaKey(Date.now()) + 'T12:00').getTime();
+  const semanas = Array.from({ length: 8 }, (_, i) => semanaKey(hoje - (7 - i) * 7 * 864e5));
+  const cont = Object.fromEntries(semanas.map(k => [k, 0]));
+  for (const l of logs) {
+    const e = exMap[l.ex], k = semanaKey(l.ts);
+    if (k in cont && (grupo === 'Todos' || (e && e.cat === grupo))) cont[k] += l.sets.length;
+  }
+  const vals = semanas.map(k => cont[k]), max = Math.max(4, ...vals);
+  const W = el.clientWidth || 330, H = 118, mt = 16, mb = 18, gap = 6, bw = (W - gap * 7) / 8;
+  const Y = v => mt + (1 - v / max) * (H - mt - mb);
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block" role="img" aria-label="Séries por semana">
+    <line x1="0" x2="${W}" y1="${H - mb}" y2="${H - mb}" stroke="var(--grade)"/>
+    ${vals.map((v, i) => {
+      const x = i * (bw + gap), atual = i === 7;
+      return `${v ? `<rect x="${x.toFixed(1)}" y="${Y(v).toFixed(1)}" width="${bw.toFixed(1)}" height="${(H - mb - Y(v)).toFixed(1)}" rx="3" fill="var(--azul)"${atual ? ' fill-opacity=".55"' : ''}/>
+        <text x="${(x + bw / 2).toFixed(1)}" y="${(Y(v) - 4).toFixed(1)}" text-anchor="middle" fill="var(--ink2)" font-size="10">${v}</text>` : ''}
+        ${i % 2 === 1 || atual ? `<text x="${(x + bw / 2).toFixed(1)}" y="${H - 5}" text-anchor="middle" fill="var(--mudo)" font-size="9">${atual ? 'esta' : dataBr(new Date(semanas[i] + 'T12:00').getTime())}</text>` : ''}`;
+    }).join('')}</svg>`;
+  return vals;
+}
+
+// evolução de um grupo (ou de todos): resumo semanal + exercícios com tendência; toque abre o detalhe
+let evoAberto = null;
+function renderEvolucao(el, grupo) {
+  const exs = [...new Set(logs.map(l => l.ex))].filter(id => exMap[id] && (grupo === 'Todos' || exMap[id].cat === grupo));
+  const ult = {};
+  logs.forEach(l => { ult[l.ex] = Math.max(ult[l.ex] || 0, l.ts); });
+  exs.sort((a, b) => ult[b] - ult[a]);
+  el.innerHTML = `<div class="tiles evo-tiles"></div>
+    <h3>Séries por semana${grupo === 'Todos' ? '' : ` — ${esc(nomeGrupo(grupo))}`}</h3><div class="evo-sem"></div>
+    <h3 style="margin-top:14px">Exercícios <span class="mudo" style="font-weight:400">— toque para ver o gráfico</span></h3>
+    <div class="evo-lista">${exs.length ? exs.map(id => {
+      const ex = exMap[id], { pts } = pontosEx(id);
+      const doEx = logs.filter(l => l.ex === id), l = doEx.reduce((a, b) => b.ts > a.ts ? b : a), top = melhorSerie(l.sets);
+      return `<div class="evo-item${evoAberto === id ? ' aberto' : ''}">
+        <button class="evo-cab" data-evo="${id}"><div class="evo-info"><div class="evo-nome">${esc(ex.nome)}</div>
+          <div class="det">${esc(carga(top.peso))} × ${top.reps}${ex.seg ? ' s' : ''} · ${quando(l.ts)} · ${pts.length} sess${pts.length > 1 ? 'ões' : 'ão'}</div></div>
+          ${sparkline(pts)}<div class="evo-t">${setaTend(tendencia(pts)) || '<span class="t-igual">—</span>'}</div></button>
+        ${evoAberto === id ? '<div class="evo-det"></div>' : ''}</div>`;
+    }).join('') : '<p class="mudo">Nenhum exercício registrado aqui ainda — o histórico aparece depois do primeiro treino.</p>'}</div>`;
+  const vals = graficoSemanas(el.querySelector('.evo-sem'), grupo);
+  const media = Math.round(vals.slice(3, 7).reduce((a, b) => a + b, 0) / 4 * 10) / 10;
+  const ultimo = Math.max(0, ...exs.map(id => ult[id]));
+  el.querySelector('.evo-tiles').innerHTML = tile(vals[7], 'séries nesta semana') + tile(num(media), 'média/semana (4 sem.)') + tile(ultimo ? quando(ultimo) : '–', 'último treino');
+  el.querySelectorAll('[data-evo]').forEach(b => b.onclick = () => {
+    evoAberto = evoAberto === b.dataset.evo ? null : b.dataset.evo;
+    renderEvolucao(el, grupo);
+    const aberto = el.querySelector('.evo-item.aberto');
+    if (aberto) aberto.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+  const det = el.querySelector('.evo-det');
+  if (det) detalheExercicio(det, evoAberto, true);
+}
+
+// detalhe de uma variação: recordes, gráficos por sessão e as últimas sessões série a série
+function detalheExercicio(el, exId, comBotao) {
+  const ex = exMap[exId];
+  const doEx = logs.filter(l => l.ex === exId);
+  if (!doEx.length) { el.innerHTML = '<p class="mudo" style="margin-top:8px">Sem registros ainda — o histórico aparece depois da primeira série.</p>'; return; }
+  const sets = doEx.flatMap(l => l.sets);
+  const { corporal, pts } = pontosEx(exId);
+  const porDia = seriesPorDia(exId);
+  const sessoes = porDia.length;
+  const un = ex.seg ? ' s' : ' reps';
+  const t = tendencia(pts);
+  el.innerHTML = `<div class="tiles" style="margin:8px 0 4px">${corporal
+    ? tile(Math.max(...sets.map(s => s.reps)) + un, 'melhor série') + tile(sets.length, 'séries') + tile(sessoes, 'sessões')
+    : tile(num(Math.max(...sets.map(s => s.peso))) + ' kg', 'melhor carga') + tile(kg(melhorE1rm(exId)) + ' kg', 'melhor e1RM') + tile(sessoes, 'sessões')}</div>
+    ${t != null ? `<p class="mudo">Tendência (últimos 60 dias): ${setaTend(t)}</p>` : ''}
+    <h3>${corporal ? `Melhor série (${un.trim()})` : 'Força estimada (e1RM, kg)'}</h3><div class="grafico g1"></div>
+    <h3>${corporal ? `Total por treino (${un.trim()})` : 'Volume por treino (kg)'}</h3><div class="grafico g2"></div>
+    <h3>Últimas sessões</h3>
+    ${doEx.slice().sort((a, b) => b.ts - a.ts).slice(0, 5).map(l => {
+      const tut = l.sets.reduce((a, s) => a + (s.dur || 0), 0);
+      const q = quando(l.ts);
+      return `<div class="sessao"><div class="cab"><b>${dataBr(l.ts)}</b> <span class="mudo">${q !== dataBr(l.ts) ? `· ${q} ` : ''}· ${l.sets.length} série${l.sets.length > 1 ? 's' : ''}${tut ? ` · ⏱ ${mmss(tut)}` : ''}</span></div>
+        <div class="pills">${l.sets.map(s => `<span class="pill">${esc(carga(s.peso))} × ${s.reps}${ex.seg ? ' s' : ''}${s.dur && !ex.seg ? ` · ${mmss(s.dur)}` : ''}${s.rir != null ? ` · <span class="rir r${Math.min(s.rir, 4)}">${rirTxt(s.rir)}</span>` : ''}</span>`).join('')}</div></div>`;
+    }).join('')}
+    ${comBotao ? `<button class="ghost larga" data-treinar="${exId}">🏋️ Treinar ${esc(ex.nome)}</button>` : ''}`;
+  const fmt = corporal ? v => kg(v) + un : v => kg(v) + ' kg';
+  graficoLinha(el.querySelector('.g1'), pts, 'var(--azul)', fmt);
+  graficoLinha(el.querySelector('.g2'), porDia.map(p => ({ x: p.x, y: corporal ? p.totReps : p.vol })), 'var(--aqua)', fmt);
+  const bt = el.querySelector('[data-treinar]');
+  if (bt) bt.onclick = () => abrirExercicio(exId);
+}
+
+// ---------- aba Progresso: evolução por grupo ----------
+let progGrupo = 'Todos';
 function renderProgresso() {
-  // tiles gerais
   const agora = Date.now(), d7 = agora - 7 * 864e5, d30 = agora - 30 * 864e5;
   const dias30 = new Set(logs.filter(l => l.ts >= d30).map(l => dayKey(l.ts))).size;
   const vol7 = logs.filter(l => l.ts >= d7).reduce((s, l) => s + volumeLog(l), 0);
   const prs = logs.filter(l => l.pr || l.sets.some(s => s.pr)).length;
   $('tiles-gerais').innerHTML =
     tile(dias30, 'treinos (30 dias)') + tile(kg(vol7) + ' kg', 'volume (7 dias)') + tile(prs, 'recordes (PR)');
-
-  // select agrupado por movimento: cada variação tem sua própria curva
-  const sel = $('sel-progresso');
-  const comLog = new Set(logs.map(l => l.ex).filter(id => exMap[id]));
-  const atual = sel.value;
-  const cats = [...new Set(movs.map(m => m.cat))];
-  sel.innerHTML = comLog.size
-    ? cats.map(c => [c, EXERCICIOS.filter(e => e.cat === c && comLog.has(e.id))]).filter(([, es]) => es.length).map(([c, es]) =>
-      `<optgroup label="${esc(nomeGrupo(c))}">${es.map(e => `<option value="${e.id}">${esc(e.nome)}</option>`).join('')}</optgroup>`).join('')
-    : '<option value="">— sem histórico ainda —</option>';
-  if (comLog.has(atual)) sel.value = atual;
-  else if (comLog.size) { // padrão: o último exercício registrado
-    const ult = logs.filter(l => exMap[l.ex]).reduce((a, b) => b.ts > a.ts ? b : a);
-    sel.value = ult.ex;
-  }
-
-  const exId = sel.value;
-  if (!exId) {
-    $('tiles-ex').innerHTML = '';
-    $('graf-e1rm').innerHTML = $('graf-volume').innerHTML = '<p class="mudo">Registre treinos para ver sua progressão.</p>';
-    $('hist-sessoes').innerHTML = '';
-    return;
-  }
-  const ex = exMap[exId];
-  const doEx = logs.filter(l => l.ex === exId);
-  const sets = doEx.flatMap(l => l.sets);
-  const melhorPeso = Math.max(...sets.map(s => s.peso));
-  const sessoes = new Set(doEx.map(l => dayKey(l.ts))).size;
-  const pts = seriesPorDia(exId);
-  const corporal = melhorPeso === 0; // sem carga: acompanha repetições (ou segundos)
-  const un = ex.seg ? ' s' : ' reps';
-  $('tiles-ex').innerHTML = corporal
-    ? tile(Math.max(...sets.map(s => s.reps)) + un, 'melhor série') + tile(sets.length, 'séries') + tile(sessoes, 'sessões')
-    : tile(num(melhorPeso) + ' kg', 'melhor carga') + tile(kg(melhorE1rm(exId)) + ' kg', 'melhor e1RM') + tile(sessoes, 'sessões');
-
-  $('tit-graf1').textContent = corporal ? `Melhor série (${un.trim()})` : 'Força estimada (e1RM, kg)';
-  $('tit-graf2').textContent = corporal ? `Total por treino (${un.trim()})` : 'Volume por treino (kg)';
-  graficoLinha($('graf-e1rm'), pts.map(p => ({ x: p.x, y: corporal ? p.reps : p.e1 })), 'var(--azul)', corporal ? v => kg(v) + un : v => kg(v) + ' kg');
-  graficoLinha($('graf-volume'), pts.map(p => ({ x: p.x, y: corporal ? p.totReps : p.vol })), 'var(--aqua)', corporal ? v => kg(v) + un : v => kg(v) + ' kg');
-
-  // detalhe das últimas sessões: carga × reps, tempo da série e esforço
-  $('hist-sessoes').innerHTML = doEx.slice().sort((a, b) => b.ts - a.ts).slice(0, 8).map(l => {
-    const tut = l.sets.reduce((t, s) => t + (s.dur || 0), 0);
-    return `<div class="sessao"><div class="cab"><b>${dataBr(l.ts)}</b> <span class="mudo">· ${quando(l.ts)} · ${l.sets.length} série${l.sets.length > 1 ? 's' : ''}${tut ? ` · ⏱ ${mmss(tut)}` : ''}</span></div>
-      <div class="pills">${l.sets.map(s => `<span class="pill">${esc(carga(s.peso))} × ${s.reps}${ex.seg ? ' s' : ''}${s.dur && !ex.seg ? ` · ${mmss(s.dur)}` : ''}${s.rir != null ? ` · <span class="rir r${Math.min(s.rir, 4)}">${rirTxt(s.rir)}</span>` : ''}</span>`).join('')}</div></div>`;
-  }).join('');
+  const grupos = ['Todos', ...gruposVisiveis().map(g => g.id)];
+  if (!grupos.includes(progGrupo)) progGrupo = 'Todos';
+  $('prog-grupos').innerHTML = grupos.map(g => `<button class="chip${g === progGrupo ? ' sel' : ''}" data-pg="${esc(g)}">${esc(nomeGrupo(g))}</button>`).join('');
+  $('prog-grupos').querySelectorAll('[data-pg]').forEach(b => b.onclick = () => { progGrupo = b.dataset.pg; evoAberto = null; renderProgresso(); });
+  renderEvolucao($('prog-evo'), progGrupo);
 }
 
 const tile = (valor, rotulo) => `<div class="tile"><div class="valor">${valor}</div><div class="rotulo">${rotulo}</div></div>`;
@@ -1608,7 +1752,6 @@ if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
     localStorage.setItem(ULT, Date.now()); // na 1ª visita só marca a data, sem baixar arquivo do nada
   }
 })();
-$('sel-progresso').onchange = renderProgresso;
 $('input-foto').onchange = e => prepararFoto(e.target);
 $('input-foto-painel').onchange = e => fotoDoPainel(e.target);
 $('bt-salvar-foto').onclick = salvarFoto;
