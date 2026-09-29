@@ -1,37 +1,7 @@
-/* Carga — Mapas do corpo (grande, mini e de foco) e aba Músculos. */
+/* Carga — Mapas do corpo (fadiga, mini e de foco) e aba Músculos. */
 'use strict';
 
-// ---------- aba Músculos ----------
-// mapa corporal 2D reaproveitado: grande (fadiga em vermelho) e mini (músculos do grupo em azul)
-const espelha = ([tag, at]) => { // forma do lado esquerdo → lado direito (eixo x = 100)
-  const a = { ...at };
-  if (tag === 'ellipse') a.cx = 200 - a.cx;
-  else if (tag === 'rect') a.x = 200 - a.x - a.width;
-  else a.d = a.d.replace(/(-?[\d.]+),(-?[\d.]+)/g, (s, x, y) => `${200 - parseFloat(x)},${y}`);
-  return [tag, a];
-};
-
-function corpoSvg({ cor, titulo, rotulos = true, estilo = '' }) {
-  const el = ([tag, at], m) => {
-    const attrs = Object.entries(at).map(([k, v]) => `${k}="${v}"`).join(' ');
-    const t = m && titulo ? `<title>${esc(titulo(m))}</title>` : '';
-    return `<${tag} ${attrs} fill="${m ? cor(m) : '#262624'}" stroke="var(--card)" stroke-width="1.5">${t}</${tag}>`;
-  };
-  let g = '';
-  for (const [vista, dx, rotulo] of [['f', 0, 'Frente'], ['c', 200, 'Costas']]) {
-    g += `<g transform="translate(${dx},0)">`;
-    for (const p of CORPO_SVG[vista]) {
-      g += el(p.forma, p.m);
-      if (p.esp) g += el(espelha(p.forma), p.m);
-    }
-    if (rotulos) g += `<text x="100" y="326" text-anchor="middle" fill="var(--mudo)" font-size="11">${rotulo}</text>`;
-    g += '</g>';
-  }
-  return `<svg viewBox="0 0 400 ${rotulos ? 332 : 310}" style="${estilo}" aria-hidden="${rotulos ? 'false' : 'true'}">${g}</svg>`;
-}
-
-const corpoMini = ms => corpoSvg({ cor: m => ms.includes(m) ? 'var(--azul)' : '#33332f', rotulos: false });
-
+// ---------- mapas do corpo (ilustração realista) ----------
 // mapa de foco: ilustração realista (frente + costas) com os músculos "acesos" por cima — vermelho forte = foco,
 // vermelho claro = auxiliar. Quando o exercício tem uma PARTE definida (ex.: deltoide lateral) só aquele pedaço acende.
 // Máscaras de vendor/anatomia/realista.js (js-rich-body-highlighter, MIT).
@@ -123,6 +93,17 @@ function vistaReal(v, pecas, vb, estilo) {
   const W = ANAT_REAL.w, H = ANAT_REAL.h;
   return `<svg viewBox="${vb}" style="${estilo};isolation:isolate">${defs ? `<defs>${defs}</defs>` : ''}
     <image href="vendor/anatomia/male-${v === 'f' ? 'front' : 'back'}-dark.webp" width="${W}" height="${H}"/><g style="mix-blend-mode:color">${corpo}</g></svg>`;
+}
+
+// mini: frente + costas inteiras com os músculos do grupo acesos (botões de grupo e sugestão do dia)
+function corpoMini(ms) {
+  const pecas = { f: [], c: [] };
+  for (const m of ms) for (const id of MUSC_REAL[m] || []) {
+    const mk = MASK_REAL[id];
+    if (mk) pecas[mk.v].push({ mk, cor: '#ff1a1a', op: 0.85 });
+  }
+  const W = ANAT_REAL.w, H = ANAT_REAL.h, vb = `${0.14 * W} 0 ${0.72 * W} ${H}`;
+  return `<span class="corpo-mini" aria-hidden="true">${vistaReal('f', pecas.f, vb, '')}${vistaReal('c', pecas.c, vb, '')}</span>`;
 }
 
 // texto do foco: partes (ou músculos inteiros) do alvo principal × auxiliares

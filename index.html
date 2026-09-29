@@ -86,7 +86,7 @@ nav button.ativo{color:var(--azul)}
   background:linear-gradient(135deg,rgba(57,135,229,.22),rgba(57,135,229,.06));border:1px solid rgba(57,135,229,.5);
   color:var(--ink);padding:10px 12px;border-radius:12px;font-weight:400;
 }
-.sug-principal svg{flex:0 0 70px;width:70px;height:auto}
+.sug-principal .corpo-mini{flex:0 0 70px;width:70px}
 .sp-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
 .sp-rot{font-size:.72rem;color:var(--ink2);text-transform:uppercase;letter-spacing:.05em}
 .sp-nome{font-size:1.25rem;font-weight:800}
@@ -134,7 +134,9 @@ li.reg .det{color:var(--mudo);font-size:.8rem;margin-top:2px}
   background:var(--pagina);border:1px solid var(--borda);border-radius:12px;color:var(--ink);
   padding:10px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;
 }
-.grupo svg{width:100%;max-width:96px;height:auto;margin-bottom:4px}
+.grupo .corpo-mini{width:100%;max-width:96px;margin-bottom:4px}
+.corpo-mini{display:flex;gap:2px}
+.corpo-mini svg{display:block;width:calc(50% - 1px);height:auto}
 .g-nome{font-weight:700;font-size:.95rem;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .g-status{font-size:.7rem;color:var(--mudo);font-weight:500}
 .sub{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mudo);margin:14px 0 0}

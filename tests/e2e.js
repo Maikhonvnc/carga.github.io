@@ -50,6 +50,7 @@ async function novaPagina(browser, base, dados) {
     const l = await pg.evaluate(() => logs[0]);
     ok(l.sets.length === 3 && l.sets[0].peso === 60, 'migra registro antigo para 3 séries');
     // 2) série cronometrada com esforço → descanso automático
+    ok(await pg.locator('[data-grupo="Peito"] .corpo-mini image').count() === 2 && await pg.locator('[data-grupo="Peito"] .corpo-mini path').count() > 0, 'ícones dos grupos no desenho realista');
     await pg.click('[data-grupo="Peito"]');
     await pg.click('.mov .chip[data-ex="supino_reto"]');
     const mapa = await pg.evaluate(() => ({ imgs: document.querySelectorAll('.p-mapa .mapa-foco image').length, acesos: document.querySelectorAll('.p-mapa .mapa-foco path[fill="#ff1a1a"]').length }));
