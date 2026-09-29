@@ -11,14 +11,33 @@ function pararAnim() {
   animToken++;
 }
 
-function mostraAnim(exId) {
+let urlGif = null;
+async function mostraAnim(exId) {
   pararAnim();
-  const box = $('anim-ex'), ex = exMap[exId];
+  const box = $('anim-ex'), ex = exMap[exId], token = animToken;
   if (!box) return;
+  let gif = null;
+  try { gif = await idbReq((await txGifs('readonly')).get(exId)); } catch { /* sem IndexedDB */ }
+  if (token !== animToken || !box.isConnected) return;
+  if (urlGif) { URL.revokeObjectURL(urlGif); urlGif = null; }
+  if (gif) { montaGif(box, ex, gif.blob); return; }
   if (!ex || (!ex.img && !ex.fe && !ANIMS[ex.anim])) { box.hidden = true; return; }
   if (ex.img) montaFotos(box, ex, q => `imgs/${ex.img}_${q}.jpg`);
   else if (ex.fe) montaFotos(box, ex, q => `${FE_URL}/${ex.fe}/${q}.jpg`);
   else montaBoneco(box, ex.anim);
+}
+
+// GIF (ou vídeo) que o próprio usuário escolheu — fica só no IndexedDB deste aparelho, nunca vai para o site
+function montaGif(box, ex, blob) {
+  urlGif = URL.createObjectURL(blob);
+  box.hidden = false;
+  if (blob.type.startsWith('video/')) {
+    box.innerHTML = `<video src="${urlGif}" autoplay loop muted playsinline aria-label="Execução: ${esc(ex.nome)}"></video>`;
+  } else {
+    box.innerHTML = `<img src="${urlGif}" alt="Execução: ${esc(ex.nome)}">`;
+    box.querySelector('img').onclick = () => abreLightbox(urlGif);
+  }
+  box.classList.add('gif');
 }
 
 // dois quadros alternados = efeito GIF (fotos do dataset aberto free-exercise-db); sem foto, cai no boneco
@@ -26,6 +45,7 @@ const FE_URL = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/
 function montaFotos(box, ex, quadroUrl) {
   const token = animToken;
   box.hidden = false;
+  box.classList.remove('gif');
   box.innerHTML = `<img src="${quadroUrl(0)}" alt="Execução: ${esc(ex.nome)}">`;
   const img = box.querySelector('img');
   img.onerror = () => { if (token === animToken) { pararAnim(); montaBoneco(box, ex.anim); } }; // sem internet/foto: boneco
@@ -39,6 +59,7 @@ function montaBoneco(box, animId) {
   const an = ANIMS[animId];
   if (!an) { box.hidden = true; return; }
   box.hidden = false;
+  box.classList.remove('gif');
   box.innerHTML = '<svg viewBox="0 0 100 100" width="92" height="92"></svg>';
   const svg = box.querySelector('svg');
   const NS = 'http://www.w3.org/2000/svg';

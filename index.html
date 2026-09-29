@@ -191,6 +191,7 @@ details.hist summary{cursor:pointer;font-weight:600;font-size:.88rem}
 }
 #anim-ex img{width:100%;height:100%;object-fit:cover;background:#fff;cursor:zoom-in}
 #anim-ex svg{width:92px;height:92px}
+#anim-ex.gif img,#anim-ex video{width:100%;height:100%;object-fit:contain;background:#000}
 .p-musc{flex:1;min-width:0}
 .p-m{font-size:.75rem;color:var(--ink2);margin-bottom:6px}
 .p-m .barra{height:5px;margin-top:3px}
@@ -512,6 +513,7 @@ body.com-barra #toast{bottom:146px}
 </nav>
 
 <input type="file" accept="image/*" capture="environment" id="input-foto-painel" hidden>
+<input type="file" accept="image/gif,image/webp,image/*,video/*" id="input-gif-painel" hidden>
 <div id="toast"></div>
 <div id="lightbox"><img alt="Foto ampliada"></div>
 

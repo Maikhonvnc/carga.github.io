@@ -141,6 +141,26 @@ async function novaPagina(browser, base, dados) {
     ok(await pg.locator('#op-c path').count() > 50 && !erros.length, 'previa.html desenha as opções ' + erros.join(' | '));
   }
 
+  // 7) GIF do próprio usuário: salva por variação no aparelho, aparece no painel e pode ser removido
+  {
+    const pg = await novaPagina(browser, base, {});
+    await pg.click('[data-grupo="Ombros"]');
+    await pg.click('.mov .chip[data-ex="elevacao_lateral"]');
+    const gif = Buffer.from('R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs=', 'base64');
+    await pg.setInputFiles('#input-gif-painel', { name: 'teste.gif', mimeType: 'image/gif', buffer: gif });
+    await pg.waitForSelector('#anim-ex.gif img[src^="blob:"]');
+    ok(await pg.locator('#bt-gif-remover').count() === 1, 'GIF do usuário aparece no painel');
+    await pg.reload();
+    await pg.waitForTimeout(300);
+    if (!(await pg.locator('#anim-ex').isVisible())) await pg.click('.mov .chip[data-ex="elevacao_lateral"]').catch(() => {});
+    await pg.waitForSelector('#anim-ex.gif img', { timeout: 3000 }).catch(() => {});
+    ok(await pg.locator('#anim-ex.gif img').count() === 1, 'GIF continua salvo depois de recarregar');
+    await pg.click('#bt-gif-remover');
+    await pg.waitForTimeout(300);
+    ok(await pg.locator('#anim-ex.gif').count() === 0 && await pg.locator('#bt-gif-remover').count() === 0, 'remove o GIF');
+    ok(!pg.erros.length, 'sem erros de página (GIF) ' + pg.erros.join(' | '));
+  }
+
   await browser.close();
   servidor.close();
   console.log(falhas ? `\n${falhas} falha(s)` : '\nTudo certo ✔');
