@@ -29,7 +29,7 @@ async function renderMaquinas() {
   const gal = $('galeria');
   gal.innerHTML = '';
   if (!fotos.length) {
-    gal.innerHTML = '<p class="mudo" style="grid-column:1/-1">Nenhuma máquina cadastrada ainda.</p>';
+    gal.innerHTML = `<div class="vazio" style="grid-column:1/-1">${ic('camera', 'ic-24')}<div><div>Nenhuma máquina cadastrada</div><div class="mudo">As fotos ficam só neste aparelho.</div></div></div>`;
     return;
   }
   for (const f of fotos) {
@@ -39,8 +39,8 @@ async function renderMaquinas() {
     card.className = 'foto-card';
     card.innerHTML = `<img src="${url}" alt="Máquina" loading="lazy">
       <div class="leg"><div class="ex">${esc(f.ex && exMap[f.ex] ? exMap[f.ex].nome : 'Sem vínculo')}</div>
-      ${f.nota ? `<div class="nota">${esc(f.nota)}</div>` : ''}
-      <button class="ghost">Excluir</button></div>`;
+      ${f.nota ? `<div class="nt">${esc(f.nota)}</div>` : ''}
+      <button class="ghost">${ic('trash', 'ic-18')}Excluir</button></div>`;
     card.querySelector('img').onclick = () => abreLightbox(url);
     card.querySelector('button').onclick = async () => {
       if (!confirm('Excluir esta foto?')) return;
@@ -70,6 +70,6 @@ async function salvarFoto() {
   }));
   fotoPendente = null;
   $('form-foto').hidden = true;
-  toast('Máquina salva 📷');
+  toast('Máquina salva');
   renderMaquinas();
 }

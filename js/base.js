@@ -56,6 +56,32 @@ const nomeCurto = mId => muscMap[mId].nome.split(' (')[0].replace(' de coxa', ''
 const corPct = pct => pct >= 85 ? 'var(--bom)' : pct >= 60 ? 'var(--atencao)' : pct >= 35 ? 'var(--serio)' : 'var(--critico)';
 const rirTxt = r => r === 0 ? 'falha' : r >= 4 ? 'sobravam 4+' : r === 1 ? 'sobrava 1' : `sobravam ${r}`;
 
+// ícone do sprite Phosphor (icones.svg); cls extra define o tamanho (ic-14…ic-30)
+const ic = (nome, cls = '') => `<svg class="ic${cls ? ' ' + cls : ''}" aria-hidden="true"><use href="icones.svg#${nome}"/></svg>`;
+// status de recuperação: sempre com ícone + palavra, nunca só cor
+const statusRecup = p => p >= 85 ? { nome: 'Pronto', cls: 'ok', ic: 'check-circle-fill' }
+  : p >= 60 ? { nome: 'Recuperando', cls: 'atencao', ic: 'hourglass-medium-fill' }
+    : p >= 35 ? { nome: 'Fatigado', cls: 'serio', ic: 'warning-fill' } : { nome: 'Muito fatigado', cls: 'critico', ic: 'warning-fill' };
+const tagRecup = (p, texto) => { const s = statusRecup(p); return `<span class="tag tag-${s.cls}">${ic(s.ic)}${esc(texto ?? (p >= 85 ? s.nome : p + '%'))}</span>`; };
+const DIAS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const dataLonga = ts => { const d = new Date(ts), s = `${DIAS[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]}`; return s[0].toUpperCase() + s.slice(1); };
+const dataCurta = ts => `${DIAS[new Date(ts).getDay()].slice(0, 3)}, ${dataBr(ts)}`; // "sáb, 26/09"
+const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+
+// folha de opções na base da tela: itens {ic, txt, valor?, sel?, acao}
+function abrirFolha(titulo, itens) {
+  const f = $('folha');
+  f.innerHTML = `<div class="folha-corpo" role="menu" aria-label="${esc(titulo)}"><div class="kicker folha-titulo">${esc(titulo)}</div>
+    ${itens.map((it, i) => `<button class="ll-linha${it.sel ? ' sel' : ''}" role="menuitem" data-i="${i}">${ic(it.ic || 'caret-right')}<span>${esc(it.txt)}</span>${it.valor ? `<span class="valor">${esc(it.valor)}</span>` : ''}</button>`).join('')}</div>`;
+  f.hidden = false;
+  f.onclick = e => { if (e.target === f) fecharFolha(); };
+  f.querySelectorAll('[data-i]').forEach(b => b.onclick = () => { fecharFolha(); itens[+b.dataset.i].acao(); });
+  const primeiro = f.querySelector('button');
+  if (primeiro) primeiro.focus();
+}
+function fecharFolha() { $('folha').hidden = true; $('folha').innerHTML = ''; }
+
 // repetições de uma série; unilateral mostra os dois lados ("E 10 / D 9")
 const repsTxt = (s, seg) => (s.repsE != null ? `E ${s.repsE} / D ${s.repsD}` : String(s.reps)) + (seg ? ' s' : '');
 const repsCurto = (s, seg) => (s.repsE != null ? `${s.repsE}/${s.repsD}` : String(s.reps)) + (seg ? ' s' : '');
@@ -165,9 +191,9 @@ function fadigaEm(muscId, t) {
 const pctRecuperado = (muscId, t = Date.now()) =>
   Math.max(0, Math.min(100, Math.round(100 - fadigaEm(muscId, t) * 12)));
 
-function horasAtePronto(muscId) { // horas até ficar >= 90% recuperado
+function horasAtePronto(muscId, alvo = 90) { // horas até ficar >= alvo% recuperado
   const agora = Date.now();
-  for (let h = 0; h <= 168; h++) if (pctRecuperado(muscId, agora + h * 3.6e6) >= 90) return h;
+  for (let h = 0; h <= 168; h++) if (pctRecuperado(muscId, agora + h * 3.6e6) >= alvo) return h;
   return 168;
 }
 

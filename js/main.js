@@ -8,12 +8,18 @@ function mostrarTab(nome) {
   tabAtual = nome;
   document.querySelectorAll('main > section, body > section').forEach(s => s.hidden = true);
   $('tab-' + nome).hidden = false;
-  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('ativo', b.dataset.tab === nome));
+  document.querySelectorAll('nav button').forEach(b => {
+    const on = b.dataset.tab === nome;
+    b.classList.toggle('ativo', on);
+    if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    b.querySelector('use').setAttribute('href', `icones.svg#${b.dataset.ic}${on ? '-fill' : ''}`); // aba ativa: ícone preenchido
+  });
   if (nome !== 'treino') pararAnim();
+  fecharFolha();
   TABS[nome]();
-  atualizaBarra();
+  renderCtl();
+  window.scrollTo(0, 0);
 }
-const rolarPara = (id, block = 'start') => { const el = $(id); if (el) el.scrollIntoView({ behavior: 'smooth', block }); };
 
 // ---------- init ----------
 function popularSelects() {
@@ -36,6 +42,7 @@ function popularSelects() {
   if (ativo.estado === 'anotando' && !ativo.pend) ativo.estado = 'pronto';
   if (!ativo.ex) ativo.estado = 'pronto';
   if (ativo.descFim && agora > ativo.descFim + 8000) ativo.descFim = 0;
+  if (!ativo.ex || (!ativo.descFim && !emSerie())) ativo.telaDesc = false;
 })();
 
 popularSelects();
@@ -59,7 +66,7 @@ if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
   const ULT = 'carga.backup_ts';
   const ult = parseInt(localStorage.getItem(ULT), 10) || 0;
   if (logs.length && Date.now() - ult > 7 * 864e5) {
-    if (ult) { exportar(); toast('Backup automático salvo em Downloads 💾'); }
+    if (ult) { exportar(); toast('Backup automático salvo em Downloads'); }
     localStorage.setItem(ULT, Date.now()); // na 1ª visita só marca a data, sem baixar arquivo do nada
   }
 })();
@@ -69,6 +76,12 @@ $('input-gif-painel').onchange = e => gifDoPainel(e.target);
 $('bt-salvar-foto').onclick = salvarFoto;
 $('bt-cancelar-foto').onclick = () => { fotoPendente = null; $('form-foto').hidden = true; };
 $('lightbox').onclick = () => $('lightbox').classList.remove('aberto');
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (!$('folha').hidden) fecharFolha();
+  else if ($('lightbox').classList.contains('aberto')) $('lightbox').classList.remove('aberto');
+  else if (!$('serie-tela').hidden) minimizarSerie();
+});
 $('bt-info').onclick = irParaPainel;
 $('aj-exp').onchange = e => { perfil.experiencia = e.target.value; salvarPerfil(); };
 $('aj-sono').onchange = e => { perfil.sono = e.target.value; salvarPerfil(); };
