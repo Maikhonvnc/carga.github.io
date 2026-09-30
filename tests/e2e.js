@@ -76,13 +76,30 @@ async function novaPagina(browser, base, dados) {
         { id: 4, ex: 'puxada_frontal', ts: agora - 2 * D, sets: [{ peso: 50, reps: 10, ts: agora - 2 * D }] },
       ],
     });
-    ok((await pg.textContent('.sug-principal')).includes('Pernas'), 'sugere o grupo treinado há mais tempo (Pernas)');
+    ok((await pg.textContent('.sug-principal')).includes('Pernas'), 'sugere a divisão treinada há mais tempo (Pernas)');
     ok(await pg.locator('.grupo.sugerido[data-grupo="Pernas"]').count() === 1 && (await pg.textContent('[data-grupo="Peito"] .g-quando')).includes('3 dias'), 'grade destaca o sugerido e mostra há quanto tempo cada grupo foi treinado');
-    await pg.click('[data-repetir="Pernas"]');
+    await pg.click('[data-repetir="pernas"]');
     await pg.waitForTimeout(200);
     ok(await pg.evaluate(() => ativo.ex === 'agachamento' && ativo.rotinaTemp.itens.join() === 'agachamento,leg_press'), 'repetir treino abre o 1º exercício daquele dia');
     ok((await pg.textContent('#p-fim')).includes('Leg press'), 'oferece o próximo exercício do treino repetido');
     ok(!pg.erros.length, 'sem erros de página (rodízio) ' + pg.erros.join(' | '));
+  }
+
+  // 3b) dia de empurrar: o treino sugerido traz peito, ombros e tríceps
+  {
+    const pg = await novaPagina(browser, base, {
+      'carga.logs': [
+        { id: 1, ex: 'supino_reto', ts: agora - 5 * D, sets: [{ peso: 60, reps: 10, ts: agora - 5 * D }] },
+        { id: 2, ex: 'puxada_frontal', ts: agora - 3 * D, sets: [{ peso: 50, reps: 10, ts: agora - 3 * D }] },
+        { id: 3, ex: 'agachamento', ts: agora - 2 * D, sets: [{ peso: 80, reps: 8, ts: agora - 2 * D }] },
+      ],
+    });
+    const titulos = await pg.locator('#sugestoes .grupo-sug .titulo').allTextContents();
+    ok((await pg.textContent('.sug-principal')).includes('Empurrar') && ['Peit', 'Ombro', 'Tríceps'].every(t => titulos.some(x => x.includes(t))),
+      'dia de empurrar sugere peito, ombros e tríceps ' + titulos.join(' | '));
+    ok(await pg.locator('.grupo.sugerido[data-grupo="Peito"]').count() === 1 && await pg.locator('.grupo.sugerido[data-grupo="Ombros"]').count() === 1
+      && await pg.locator('.grupo.sugerido[data-grupo="Pernas"]').count() === 0, 'grade marca os grupos da divisão do dia');
+    ok(!pg.erros.length, 'sem erros de página (divisão) ' + pg.erros.join(' | '));
   }
 
   // 4) unilateral, progressão pelo esforço e estagnação

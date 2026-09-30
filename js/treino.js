@@ -72,15 +72,15 @@ function renderGrupos(el) {
   const hoje = hojeKey();
   const feitos = {};
   logs.forEach(l => { if (dayKey(l.ts) === hoje && exMap[l.ex]) feitos[exMap[l.ex].cat] = (feitos[exMap[l.ex].cat] || 0) + 1; });
-  const rod = rodizioGrupos(), sug = logs.length ? escolheSugerido(rod) : null;
-  const ult = Object.fromEntries(rod.map(x => [x.g.id, x.ult]));
+  const rod = rodizioGrupos(), ult = Object.fromEntries(rod.map(x => [x.g.id, x.ult]));
+  const rodD = rodizioDivisoes(), divDia = logs.length ? (rodD.find(x => x.hoje) || escolheSugerido(rodD)) : null;
   el.innerHTML = '<h3>🏋️ O que vamos treinar?</h3><p class="mudo dica-grade">Toque no grupo para ver os exercícios.</p><div class="grupos">' + gruposVisiveis().map(g => {
     const pior = g.musculos.map(m => ({ m, pct: recup[m] })).sort((a, b) => a.pct - b.pct)[0];
     const status = !pior ? '' : pior.pct >= 85 ? '<span style="color:var(--bom)">✅ pronto</span>'
       : `<span style="color:${corPct(pior.pct)}">⏳ ${esc(nomeCurto(pior.m))} ${pior.pct}%</span>`;
     const quando = feitos[g.id] ? `✓ ${feitos[g.id]} hoje` : haQuanto(ult[g.id]);
-    const eSug = sug && sug.g.id === g.id;
-    return `<button class="grupo${eSug ? ' sugerido' : ''}" data-grupo="${esc(g.id)}">${eSug ? '<span class="g-selo">sugerido</span>' : ''}${corpoMini(g.musculos)}
+    const eSug = divDia && grupoNaDivisao(g, divDia.d);
+    return `<button class="grupo${eSug ? ' sugerido' : ''}" data-grupo="${esc(g.id)}">${eSug ? `<span class="g-selo">${esc(nomeDivisao(divDia.d))}</span>` : ''}${corpoMini(g.musculos)}
       <span class="g-nome">${esc(nomeGrupo(g.id))}</span>
       <span class="g-status">${status}</span><span class="g-quando">${esc(quando)}</span></button>`;
   }).join('') + '</div>';
