@@ -48,7 +48,7 @@ button,.btn{
   font-family:inherit;
 }
 button.ghost,.btn.ghost{background:transparent;border:1px solid var(--borda);color:var(--ink2)}
-button.perigo{background:var(--critico)}
+button.perigo{background:transparent;border:1px solid var(--critico);color:#ff6b6b}
 button:active{opacity:.8}
 .larga{width:100%;margin-top:12px}
 .grande{padding:16px;font-size:1.1rem}
@@ -65,7 +65,8 @@ nav button{
   color:var(--mudo);font-size:.65rem;font-weight:500;
 }
 nav button span{display:block;font-size:1.25rem;margin-bottom:2px}
-nav button.ativo{color:var(--azul)}
+nav button.ativo{color:var(--azul);font-weight:700}
+nav button.ativo span{background:rgba(57,135,229,.18);border-radius:999px;width:52px;margin:0 auto 2px;padding:1px 0}
 
 /* chips */
 .chips{display:flex;flex-wrap:wrap;gap:8px}
@@ -90,9 +91,9 @@ nav button.ativo{color:var(--azul)}
 .sp-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
 .sp-rot{font-size:.72rem;color:var(--ink2);text-transform:uppercase;letter-spacing:.05em}
 .sp-nome{font-size:1.25rem;font-weight:800}
+.sp-mus{font-size:.8rem;color:var(--ink);font-weight:600}
 .sp-det{font-size:.78rem;color:var(--ink2)}
 .sp-seta{font-size:1.8rem;color:var(--azul)}
-.chip.fatigado{opacity:.6}
 .rep-lista{display:block;font-weight:400;font-size:.72rem;color:var(--mudo);margin-top:3px;line-height:1.35}
 .grupo-sug .titulo{font-size:.8rem;color:var(--ink2);margin-bottom:6px}
 .titulo .x-rot,.x-rot{color:var(--mudo);cursor:pointer;margin-left:8px;background:none;border:none;font-size:.85rem;padding:2px 6px}
@@ -129,7 +130,7 @@ li.reg .det{color:var(--mudo);font-size:.8rem;margin-top:2px}
 .nav-treino{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .nav-treino h3{margin:0}
 .voltar{background:none;border:1px solid var(--borda);color:var(--ink2);padding:6px 11px;font-size:.85rem}
-.grupos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.grupos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 8px;padding-top:6px}
 .grupo{
   background:var(--pagina);border:1px solid var(--borda);border-radius:12px;color:var(--ink);
   padding:10px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;
@@ -138,7 +139,14 @@ li.reg .det{color:var(--mudo);font-size:.8rem;margin-top:2px}
 .corpo-mini{display:flex;gap:2px}
 .corpo-mini svg{display:block;width:calc(50% - 1px);height:auto}
 .g-nome{font-weight:700;font-size:.95rem;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.g-status{font-size:.7rem;color:var(--mudo);font-weight:500}
+.g-status{font-size:.72rem;color:var(--mudo);font-weight:600}
+.g-quando{font-size:.68rem;color:var(--mudo);font-weight:400}
+.grupo{position:relative}
+.grupo.sugerido{border-color:var(--azul);box-shadow:0 0 0 1px var(--azul) inset}
+.g-selo{position:absolute;top:-9px;left:50%;transform:translateX(-50%);white-space:nowrap;background:var(--azul);color:#fff;font-size:.6rem;font-weight:700;padding:2px 6px;border-radius:999px;text-transform:uppercase;letter-spacing:.04em}
+.dica-grade{font-size:.8rem;margin:-4px 0 10px}
+.mov .chip[data-ex]{border-color:rgba(255,255,255,.2);background:#232321}
+.mov .chip-mais{font-size:.78rem;border-style:dashed}
 .sub{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mudo);margin:14px 0 0}
 .mov{padding:10px 0;border-bottom:1px solid var(--borda)}
 .mov:last-child{border-bottom:none}
@@ -291,6 +299,8 @@ li.serie .bt-ok{padding:6px 10px;font-size:.85rem;margin-left:4px}
 .tile{background:var(--card);border:1px solid var(--borda);border-radius:12px;padding:10px}
 .tile .valor{font-size:1.15rem;font-weight:700;white-space:nowrap}
 .tile .rotulo{font-size:.7rem;color:var(--mudo);margin-top:2px}
+.tile-vazio{grid-column:span 3}
+.tile-vazio .valor{color:var(--ink2);font-size:1rem}
 .t4 .tile{padding:9px 8px}
 .t4 .tile .valor{font-size:1.05rem;white-space:nowrap}
 .t4 .tile .rotulo{font-size:.65rem}
