@@ -34,7 +34,7 @@ function renderTreinar() {
   pararAnim();
   renderCtl();
   if (ativo.grupo) return renderListaGrupo(el);
-  renderDia();
+  renderDia(); // antes da grade: define o treino do card, que a grade destaca
   renderGrupos();
   renderRotinas();
   renderLogHoje();
@@ -58,7 +58,8 @@ function renderGrupos() {
   $('grupos').innerHTML = gruposVisiveis().map(g => {
     const pct = g.musculos.length ? Math.min(...g.musculos.map(m => recup[m])) : 100;
     const s = statusRecup(pct);
-    return `<button class="grupo" data-grupo="${esc(g.id)}">${corpoMini(g.musculos)}
+    const doDia = treinoDoCard && grupoNoTreino(g, treinoDoCard); // grupos do treino do dia ganham o selo
+    return `<button class="grupo${doDia ? ' sugerido' : ''}" data-grupo="${esc(g.id)}">${doDia ? `<span class="g-selo">${esc(treinoDoCard.nome)}</span>` : ''}${corpoMini(g.musculos)}
       <span class="g-nome">${esc(nomeGrupo(g.id))}</span>
       <span class="g-status c-${s.cls}">${ic(s.ic)}${pct >= 85 ? s.nome : pct + '%'}</span>
       <span class="g-quando">${ult[g.id] ? esc(quando(ult[g.id])) : 'nunca'}</span></button>`;
@@ -527,9 +528,10 @@ function renderLogHoje() {
 // ---------- rotinas ----------
 function renderRotinas() {
   const el = $('rotinas-lista');
+  $('bt-salvar-rotina').hidden = !logs.some(l => dayKey(l.ts) === hojeKey()); // só dá para salvar o que já foi feito hoje
   if (!rotinas.length) {
     el.innerHTML = `<div class="vazio">${ic('list-checks', 'ic-24')}<div><div>Nenhuma rotina salva</div>
-      <div class="mudo">Depois de treinar, toque em Nova para guardar o treino de hoje.</div></div></div>`;
+      <div class="mudo">Depois de treinar, toque em Nova para guardar o treino do dia.</div></div></div>`;
     return;
   }
   const feitos = new Set(logs.filter(l => dayKey(l.ts) === hojeKey()).map(l => l.ex));

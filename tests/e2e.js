@@ -93,6 +93,23 @@ async function novaPagina(browser, base, dados) {
     ok(!pg.erros.length, 'sem erros de página (rodízio) ' + pg.erros.join(' | '));
   }
 
+  // 3b) dia de empurrar: o plano traz peito, ombros e tríceps, e a grade marca os grupos do dia
+  {
+    const pg = await novaPagina(browser, base, {
+      'carga.logs': [
+        { id: 1, ex: 'supino_reto', ts: agora - 5 * D, sets: [{ peso: 60, reps: 10, ts: agora - 5 * D }] },
+        { id: 2, ex: 'puxada_frontal', ts: agora - 3 * D, sets: [{ peso: 50, reps: 10, ts: agora - 3 * D }] },
+        { id: 3, ex: 'agachamento', ts: agora - 2 * D, sets: [{ peso: 80, reps: 8, ts: agora - 2 * D }] },
+      ],
+    });
+    ok((await pg.textContent('#card-dia .titulo')).includes('Empurrar'), 'sugere Empurrar depois de puxar e pernas');
+    ok(await pg.locator('.grupo.sugerido[data-grupo="Peito"]').count() === 1 && await pg.locator('.grupo.sugerido[data-grupo="Ombros"]').count() === 1
+      && await pg.locator('.grupo.sugerido[data-grupo="Pernas"]').count() === 0, 'grade marca os grupos do treino do dia');
+    ok((await pg.textContent('[data-grupo="Peito"] .g-quando')).includes('5 dias'), 'grade mostra há quanto tempo cada grupo foi treinado');
+    ok(await pg.isHidden('#bt-salvar-rotina'), '"Nova" rotina só aparece depois de treinar no dia');
+    ok(!pg.erros.length, 'sem erros de página (divisão) ' + pg.erros.join(' | '));
+  }
+
   // 4) unilateral, progressão pelo esforço e estagnação
   {
     const sess = (ex, dias, sets) => ({ id: Math.random(), ex, ts: agora - dias * D, sets: sets.map(s => ({ ts: agora - dias * D, ...s })) });

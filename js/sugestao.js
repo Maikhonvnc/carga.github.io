@@ -2,12 +2,17 @@
 'use strict';
 
 // ---------- treinos ----------
-// os três treinos da divisão; os músculos de cada um vêm de REGIOES (data.js)
+// os três treinos da divisão; os músculos de cada um vêm de REGIOES (data.js).
+// principais = os que definem se o treino está recuperado (antebraço e adutores só ajudam)
 const TREINOS = [
-  { id: 'empurrar', nome: 'Empurrar', det: 'Peito · Ombros · Tríceps', curto: 'Peito · Ombros · Tríceps' },
-  { id: 'puxar', nome: 'Puxar', det: 'Costas · Bíceps', curto: 'Costas · Bíceps' },
-  { id: 'pernas', nome: 'Pernas', det: 'Coxas · Glúteos · Panturrilha', curto: 'Coxas · Glúteos' },
+  { id: 'empurrar', nome: 'Empurrar', det: 'Peito · Ombros · Tríceps', curto: 'Peito · Ombros · Tríceps', principais: ['peito', 'ombros', 'triceps'] },
+  { id: 'puxar', nome: 'Puxar', det: 'Costas · Bíceps', curto: 'Costas · Bíceps', principais: ['costas', 'biceps'] },
+  { id: 'pernas', nome: 'Pernas', det: 'Coxas · Glúteos · Panturrilha', curto: 'Coxas · Glúteos', principais: ['quadriceps', 'posteriores', 'gluteos', 'panturrilha'] },
 ].map(t => ({ ...t, musculos: REGIOES.find(r => r.id === t.id).musculos }));
+// grupo da tela inicial que pertence ao treino (a maioria dos músculos do grupo nele)
+const grupoNoTreino = (g, t) => g.musculos.length > 0 && g.musculos.filter(m => t.musculos.includes(m)).length / g.musculos.length >= 0.6;
+// treino que a tela inicial está mostrando no card do dia (null = descanso ou primeiro uso)
+let treinoDoCard = null;
 let treinoEscolha = null; // treino que o usuário escolheu no lugar do sugerido (vale até recarregar)
 
 // treino de um dia: o que mais recebeu séries (cada série pesa a fração do músculo no exercício); só core = nenhum
@@ -70,7 +75,7 @@ function estadoTreinos() {
   return TREINOS.map(t => {
     const ds = dias[t.id] || [];
     const ult = ds.find(d => d.dia !== hoje);
-    const pior = t.musculos.reduce((a, m) => (recup[m] < a.pct ? { m, pct: recup[m] } : a), { m: null, pct: 100 });
+    const pior = t.principais.reduce((a, m) => (recup[m] < a.pct ? { m, pct: recup[m] } : a), { m: null, pct: 100 });
     return { t, dias, hoje: ds.some(d => d.dia === hoje), ultTs: ult ? ult.logs[ult.logs.length - 1].ts : 0, pct: pior.pct, pior: pior.m };
   });
 }
@@ -84,7 +89,7 @@ function treinoSugerido(est) {
   return ord.find(x => x.ultTs && livre(x)) || ord.find(livre) || null;
 }
 
-const horasTreino = e => Math.max(0, ...e.t.musculos.filter(m => pctRecuperado(m) < 85).map(m => horasAtePronto(m, 85)));
+const horasTreino = e => Math.max(0, ...e.t.principais.filter(m => pctRecuperado(m) < 85).map(m => horasAtePronto(m, 85)));
 function txtHoras(h) {
   if (h < 1) return 'pronto em menos de 1 h';
   const quando = new Date(Date.now() + h * 3.6e6);
@@ -115,10 +120,12 @@ function renderDia() {
   const el = $('dia');
   const est = estadoTreinos();
   $('sec-outros').hidden = true;
+  treinoDoCard = null;
   if (!logs.length) return renderPrimeiroUso(el, est);
   const escolhido = treinoEscolha && est.find(x => x.t.id === treinoEscolha);
   const e = escolhido || treinoSugerido(est);
   if (!e) return renderDescanso(el, est);
+  treinoDoCard = e.t;
   renderHero(el, e);
   renderOutros(est.filter(x => x !== e));
 }
@@ -189,6 +196,7 @@ function renderOutros(outros) {
 function escolherTreino(id) {
   treinoEscolha = id;
   renderDia();
+  renderGrupos();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -215,6 +223,7 @@ function renderDescanso(el, est) {
 let primeiroEscolha = 'empurrar';
 function renderPrimeiroUso(el) {
   const t = TREINOS.find(x => x.id === primeiroEscolha);
+  treinoDoCard = t;
   el.innerHTML = `<div class="tela justa"><div class="card hero">
       <div class="hero-txt"><div class="kicker azul">Primeiro treino</div><div class="titulo-2">Qual é o treino de hoje?</div>
         <div class="mudo">Depois do primeiro registro, o Carga sugere o próximo pela sua recuperação.</div></div>
@@ -226,7 +235,7 @@ function renderPrimeiroUso(el) {
       <div class="como-it">${ic('barbell')}<div><b>Anote carga × repetições</b><span>Cada variação guarda a própria carga e sugere o alvo da próxima vez.</span></div></div>
       <div class="como-it">${ic('timer')}<div><b>O descanso conta sozinho</b><span>Vibra e toca um bipe quando for hora da próxima série.</span></div></div>
       <div class="como-it">${ic('person-arms-spread')}<div><b>Veja o que já recuperou</b><span>A aba Músculos estima a recuperação de cada grupo.</span></div></div></div></div>`;
-  el.querySelectorAll('[data-op]').forEach(b => b.onclick = () => { primeiroEscolha = b.dataset.op; renderPrimeiroUso(el); });
+  el.querySelectorAll('[data-op]').forEach(b => b.onclick = () => { primeiroEscolha = b.dataset.op; renderPrimeiroUso(el); renderGrupos(); });
   $('bt-comecar').onclick = () => comecarTreino(t, planoTreino(t, {}).itens);
   $('bt-por-grupo').onclick = () => $('sec-grupos').scrollIntoView({ behavior: 'smooth' });
 }
