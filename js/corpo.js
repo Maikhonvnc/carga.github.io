@@ -122,6 +122,7 @@ function focoInfo(ex) {
   return { foco, aux };
 }
 
+let muscFiltro = 'todos', muscAberto = null;
 function renderMusculos() {
   const recup = {};
   MUSCULOS.forEach(m => { recup[m.id] = pctRecuperado(m.id); });
@@ -136,24 +137,32 @@ function renderMusculos() {
     }
   }
   const W = ANAT_REAL.w, H = ANAT_REAL.h, vb = `${0.14 * W} 0 ${0.72 * W} ${H}`;
-  const st = 'display:block;width:calc(50% - 3px);height:auto;border-radius:10px;background:#111';
-  $('mapa-corpo').innerHTML = `<div class="mapa-fadiga">${vistaReal('f', pecas.f, vb, st)}${vistaReal('c', pecas.c, vb, st)}</div>`
+  const st = 'display:block;width:calc(50% - 4px);height:auto;border-radius:12px;background:#111';
+  $('mapa-corpo').innerHTML = `<div class="mapa-fadiga" role="img" aria-label="Mapa de fadiga: quanto mais vermelho, mais fatigado">${vistaReal('f', pecas.f, vb, st)}${vistaReal('c', pecas.c, vb, st)}</div>`
     + '<div class="escala"><span>descansado</span><div></div><span>fatigado</span></div>';
+
+  const recuperando = MUSCULOS.filter(m => recup[m.id] < 85).length;
+  const filtros = [['todos', 'Todos'], ['rec', `Recuperando · ${recuperando}`], ['prontos', `Prontos · ${MUSCULOS.length - recuperando}`]];
+  $('musc-filtro').innerHTML = filtros.map(([id, txt]) => `<button class="chip" role="radio" aria-checked="${muscFiltro === id}" data-filtro="${id}">${txt}</button>`).join('');
+  $('musc-filtro').querySelectorAll('[data-filtro]').forEach(b => b.onclick = () => { muscFiltro = b.dataset.filtro; renderMusculos(); });
+
+  const lista = MUSCULOS.filter(m => muscFiltro === 'todos' || (muscFiltro === 'rec') === (recup[m.id] < 85))
+    .sort((a, b) => recup[a.id] - recup[b.id]);
   const el = $('musculos-grid');
-  el.innerHTML = MUSCULOS.map(m => {
-    const pct = recup[m.id];
-    const ultimo = ultimoTreino(m.id);
-    const estado = pct >= 85 ? '✅ Pronto' : `⏳ ~${horasAtePronto(m.id)}h p/ 90%`;
-    return `<div class="musculo">
-      <div class="cab"><span class="nome">${esc(m.nome)}</span><span class="estado" style="color:${corPct(pct)}">${estado} · ${pct}%</span></div>
-      <div class="barra"><div style="width:${pct}%;background:${corPct(pct)}"></div></div>
-      <div class="rodape">${ultimo ? 'último treino: ' + dataBr(ultimo) : 'nunca treinado'}</div>
-      <div class="fb">
-        ${pct < 90 ? `<button data-fb="pronto" data-m="${m.id}">💪 Já recuperei</button>` : ''}
-        ${pct >= 60 ? `<button data-fb="mais" data-m="${m.id}">😮‍💨 Preciso de mais tempo</button>` : ''}
-      </div>
-    </div>`;
-  }).join('');
+  el.innerHTML = lista.map(m => {
+    const pct = recup[m.id], s = statusRecup(pct), ult = ultimoTreino(m.id);
+    const treinado = ult ? `treinado ${haQuanto(ult)}` : 'nunca treinado';
+    const detalhe = pct < 85 ? `pronto em ~${horasAtePronto(m.id, 85)} h · ${treinado}` : treinado;
+    const aberto = muscAberto === m.id;
+    return `<div><button class="musculo" data-m="${m.id}" aria-expanded="${aberto}">
+        <span class="c-${s.cls}" style="display:flex">${ic(s.ic)}</span>
+        <span class="musc-txt"><span class="musc-cab"><span>${esc(m.nome)}</span><b>${pct}%</b></span>
+          <span class="barra"><span style="display:block;height:100%;border-radius:3px;width:${pct}%;background:var(--${s.cls === 'ok' ? 'ok' : s.cls})"></span></span>
+          <span class="musc-rod"><b class="c-${s.cls}">${s.nome}</b> · ${esc(detalhe)}</span></span></button>
+      ${aberto ? `<div class="fb">${pct < 90 ? `<button class="ghost" data-fb="pronto" data-m="${m.id}">Já recuperei</button>` : ''}
+        ${pct >= 60 ? `<button class="ghost" data-fb="mais" data-m="${m.id}">Preciso de mais tempo</button>` : ''}</div>` : ''}</div>`;
+  }).join('') || '<p class="mudo" style="padding:16px">Nenhum músculo neste filtro.</p>';
+  el.querySelectorAll('.musculo').forEach(b => b.onclick = () => { muscAberto = muscAberto === b.dataset.m ? null : b.dataset.m; renderMusculos(); });
   el.querySelectorAll('[data-fb]').forEach(b => b.onclick = () => feedbackMusculo(b.dataset.m, b.dataset.fb));
 }
 
@@ -165,6 +174,6 @@ function feedbackMusculo(mId, tipo) {
     : Math.min(1.3, +(perfil.fator * 1.05).toFixed(2));
   salvarPerfil();
   salvarOverrides();
-  toast(tipo === 'pronto' ? 'Anotado! Modelo ajustado: você recupera mais rápido 💪' : 'Ok, dando mais tempo pra esse músculo 😮‍💨');
+  toast(tipo === 'pronto' ? 'Anotado: modelo ajustado, você recupera mais rápido' : 'Ok, mais tempo para esse músculo');
   renderMusculos();
 }

@@ -1,84 +1,237 @@
-/* Carga — Sugestão de treino do dia. */
+/* Carga — Treino do dia: sugestão por treino (Empurrar, Puxar, Pernas), plano com alvos e estados vazios. */
 'use strict';
 
-// ---------- sugestão de treino ----------
-const GASTO_ALVO = 5; // estímulo diário a partir do qual o músculo conta como "finalizado" (= nível "pesado")
-const nivelSti = s => s < 2 ? 'leve' : s < 5 ? 'moderado' : 'pesado';
+// ---------- treinos ----------
+// os três treinos da divisão; os músculos de cada um vêm de REGIOES (data.js)
+const TREINOS = [
+  { id: 'empurrar', nome: 'Empurrar', det: 'Peito · Ombros · Tríceps', curto: 'Peito · Ombros · Tríceps' },
+  { id: 'puxar', nome: 'Puxar', det: 'Costas · Bíceps', curto: 'Costas · Bíceps' },
+  { id: 'pernas', nome: 'Pernas', det: 'Coxas · Glúteos · Panturrilha', curto: 'Coxas · Glúteos' },
+].map(t => ({ ...t, musculos: REGIOES.find(r => r.id === t.id).musculos }));
+let treinoEscolha = null; // treino que o usuário escolheu no lugar do sugerido (vale até recarregar)
 
-function sugerirTreino() {
+// treino de um dia: o que mais recebeu séries (cada série pesa a fração do músculo no exercício); só core = nenhum
+function treinoDoDia(doDia) {
+  let melhor = null, max = 0;
+  for (const t of TREINOS) {
+    const s = doDia.reduce((a, l) => {
+      const e = exMap[l.ex];
+      return e ? a + l.sets.length * t.musculos.reduce((b, m) => b + (e.musculos[m] || 0), 0) : a;
+    }, 0);
+    if (s > max) { max = s; melhor = t; }
+  }
+  return melhor;
+}
+
+// treino.id → dias em que ele foi feito, do mais recente ao mais antigo
+function diasPorTreino() {
+  const porDia = {};
+  for (const l of logs) (porDia[dayKey(l.ts)] ||= []).push(l);
+  const res = {};
+  for (const [dia, ls] of Object.entries(porDia)) {
+    const t = treinoDoDia(ls);
+    if (t) (res[t.id] ||= []).push({ dia, logs: ls.slice().sort((a, b) => a.ts - b.ts) });
+  }
+  for (const k in res) res[k].sort((a, b) => (a.dia < b.dia ? 1 : -1));
+  return res;
+}
+
+// plano: repete o último dia deste treino (exercícios na ordem feita, mesmo nº de séries);
+// sem histórico, monta 5 exercícios pelos músculos do treino
+function planoTreino(t, dias) {
   const hoje = hojeKey();
-  const logsHoje = logs.filter(l => dayKey(l.ts) === hoje);
-  const stiHoje = {};
-  MUSCULOS.forEach(m => { stiHoje[m.id] = logsHoje.reduce((s, l) => s + estimulo(l, m.id), 0); });
-  const estados = MUSCULOS.map(m => ({ m, pct: pctRecuperado(m.id), ultimo: ultimoTreino(m.id), sti: stiHoje[m.id] }));
-  const emRecuperacao = estados.filter(x => x.pct < 60 && x.sti < 0.5); // fatigado de dias anteriores
-  const movsHoje = new Set(logsHoje.map(l => exMap[l.ex] && exMap[l.ex].mov));
+  const ant = (dias[t.id] || []).find(d => d.dia !== hoje);
+  if (ant) {
+    const itens = [...new Set(ant.logs.map(l => l.ex))].filter(id => exMap[id]);
+    const series = {};
+    for (const l of ant.logs) series[l.ex] = (series[l.ex] || 0) + l.sets.length;
+    if (itens.length) return { ts: ant.logs[0].ts, itens, series };
+  }
   const ultimoUso = {};
   logs.forEach(l => { ultimoUso[l.ex] = Math.max(ultimoUso[l.ex] || 0, l.ts); });
-
-  // por movimento que foca o músculo: a variação usada por último (ou a primeira do catálogo)
-  const escolheExs = mId => {
+  const itens = [], usados = new Set();
+  t.musculos.forEach((m, i) => {
     const porMov = {};
     for (const e of EXERCICIOS) {
-      if ((e.musculos[mId] || 0) < 0.5 || movsHoje.has(e.mov)) continue;
+      if ((e.musculos[m] || 0) < 0.5 || usados.has(e.mov) || e.custom) continue;
       const atual = porMov[e.mov];
       if (!atual || (ultimoUso[e.id] || 0) > (ultimoUso[atual.id] || 0)) porMov[e.mov] = e;
     }
-    const cands = Object.values(porMov);
-    const conhecidos = cands.filter(e => ultimoUso[e.id]);
-    return [...conhecidos, ...cands.filter(e => !ultimoUso[e.id])].slice(0, 2);
-  };
-
-  // sessão em andamento: detecta a região pelo estímulo do dia e sugere o que falta finalizar nela
-  let regiao = null, grupos = [], completa = false;
-  if (logsHoje.length) {
-    const top = REGIOES.map(r => ({ r, score: r.musculos.reduce((s, m) => s + stiHoje[m], 0) }))
-      .sort((a, b) => b.score - a.score)[0];
-    if (top.score > 0) {
-      regiao = top.r;
-      grupos = estados
-        .filter(x => regiao.musculos.includes(x.m.id) && x.sti < GASTO_ALVO && !emRecuperacao.includes(x))
-        .sort((a, b) => a.sti - b.sti || b.pct - a.pct)
-        .map(x => ({ m: x.m, sti: x.sti, exs: escolheExs(x.m.id) }))
-        .filter(g => g.exs.length)
-        .slice(0, 4);
-      completa = !grupos.length;
-    }
-  }
-
-  // sem treino hoje (ou região finalizada): sugere pelos mais descansados/parados há mais tempo
-  if (!grupos.length) {
-    grupos = estados
-      .filter(x => x.pct >= 85 && x.sti < 0.5)
-      .sort((a, b) => (a.ultimo || 0) - (b.ultimo || 0))
-      .slice(0, 4)
-      .map(x => ({ m: x.m, exs: escolheExs(x.m.id) }))
-      .filter(g => g.exs.length);
-  }
-
-  return { grupos, emRecuperacao, regiao, completa };
+    const cands = Object.values(porMov).sort((a, b) => (ultimoUso[b.id] || 0) - (ultimoUso[a.id] || 0));
+    for (const e of cands.slice(0, i < 2 ? 2 : 1)) if (itens.length < 5) { itens.push(e.id); usados.add(e.mov); }
+  });
+  return { ts: 0, itens, series: {} };
 }
 
-
-// ---------- rodízio de grupos ----------
-// sem dias fixos: o grupo treinado há mais tempo (e já recuperado) é o sugerido; os outros ficam ao lado
-function rodizioGrupos() {
-  const ult = {};
-  for (const l of logs) { const e = exMap[l.ex]; if (e) ult[e.cat] = Math.max(ult[e.cat] || 0, l.ts); }
+function estadoTreinos() {
+  const dias = diasPorTreino(), hoje = hojeKey();
   const recup = {};
   MUSCULOS.forEach(m => { recup[m.id] = pctRecuperado(m.id); });
-  const hoje = hojeKey();
-  return gruposVisiveis().map(g => {
-    const pior = g.musculos.length ? g.musculos.reduce((a, m) => recup[m] < a.pct ? { m, pct: recup[m] } : a, { m: null, pct: 101 }) : { m: null, pct: 100 };
-    return { g, ult: ult[g.id] || 0, hoje: !!ult[g.id] && dayKey(ult[g.id]) === hoje, pior };
-  }).sort((a, b) => a.ult - b.ult);
+  return TREINOS.map(t => {
+    const ds = dias[t.id] || [];
+    const ult = ds.find(d => d.dia !== hoje);
+    const pior = t.musculos.reduce((a, m) => (recup[m] < a.pct ? { m, pct: recup[m] } : a), { m: null, pct: 100 });
+    return { t, dias, hoje: ds.some(d => d.dia === hoje), ultTs: ult ? ult.logs[ult.logs.length - 1].ts : 0, pct: pior.pct, pior: pior.m };
+  });
 }
 
-function escolheSugerido(rod) {
-  const livre = x => !x.hoje && x.pior.pct >= 60;
-  return rod.find(x => x.ult && livre(x)) || rod.find(livre) || null; // prioriza quem já faz parte do seu rodízio
+// sugerido: o treino que o dia já começou; senão o feito há mais tempo que já recuperou (≥ 60%)
+function treinoSugerido(est) {
+  const andamento = est.find(e => e.hoje);
+  if (andamento) return andamento;
+  const ord = est.slice().sort((a, b) => a.ultTs - b.ultTs);
+  const livre = e => e.pct >= 60;
+  return ord.find(x => x.ultTs && livre(x)) || ord.find(livre) || null;
 }
 
+const horasTreino = e => Math.max(0, ...e.t.musculos.filter(m => pctRecuperado(m) < 85).map(m => horasAtePronto(m, 85)));
+function txtHoras(h) {
+  if (h < 1) return 'pronto em menos de 1 h';
+  const quando = new Date(Date.now() + h * 3.6e6);
+  return quando.getDate() === new Date().getDate() && quando.getHours() >= 18 ? 'pronto hoje à noite' : `pronto em ~${h} h`;
+}
+const haQuanto = ts => { if (!ts) return 'nunca'; const q = quando(ts); return q === dataBr(ts) ? `em ${q}` : q; };
+
+// "Supino reto <span>· Barra</span>"
+function nomeEx(exId) {
+  const ex = exMap[exId], mov = movMap[ex.mov];
+  return mov && mov.vars.length > 1 ? `${esc(mov.nome)} <span class="c-3">· ${esc(ex.vnome)}</span>` : esc(ex.nome);
+}
+function alvoTxt(exId) {
+  const d = dicaCarga(exId), ex = exMap[exId];
+  return d ? `${carga(d.alvoPeso)} × ${d.alvoReps}${ex.seg ? ' s' : ''}` : 'primeira vez';
+}
+
+function comecarTreino(t, itens) {
+  if (!itens.length) return toast('Escolha um grupo abaixo para montar o treino.');
+  const feitos = new Set(logs.filter(l => dayKey(l.ts) === hojeKey()).map(l => l.ex));
+  ativo.rotina = 'rep';
+  ativo.rotinaTemp = { id: 'rep', nome: t.nome, itens };
+  abrirExercicio(itens.find(id => !feitos.has(id)) || itens[0]);
+}
+
+// ---------- tela inicial: o card do dia ----------
+function renderDia() {
+  const el = $('dia');
+  const est = estadoTreinos();
+  $('sec-outros').hidden = true;
+  if (!logs.length) return renderPrimeiroUso(el, est);
+  const escolhido = treinoEscolha && est.find(x => x.t.id === treinoEscolha);
+  const e = escolhido || treinoSugerido(est);
+  if (!e) return renderDescanso(el, est);
+  renderHero(el, e);
+  renderOutros(est.filter(x => x !== e));
+}
+
+function renderHero(el, e) {
+  const t = e.t, hoje = hojeKey();
+  const plano = planoTreino(t, e.dias);
+  const doDia = logs.filter(l => dayKey(l.ts) === hoje);
+  const feitos = new Set(doDia.map(l => l.ex));
+  const andamento = e.hoje;
+  const itens = andamento ? [...plano.itens, ...[...feitos].filter(id => exMap[id] && !plano.itens.includes(id))] : plano.itens;
+  const nFeitos = itens.filter(id => feitos.has(id)).length;
+  const setsHoje = id => doDia.filter(l => l.ex === id).reduce((s, l) => s + l.sets.length, 0);
+  const linhas = itens.map((id, i) => feitos.has(id)
+    ? `<div class="plano-it feito"><span class="n">${ic('check-circle-fill')}</span><span class="nome">${nomeEx(id)}</span><span class="alvo">${plural(setsHoje(id), 'série', 'séries')}</span></div>`
+    : `<div class="plano-it"><span class="n">${i + 1}</span><span class="nome">${nomeEx(id)}</span><span class="alvo">${esc(alvoTxt(id))}</span></div>`).join('');
+  const nSeries = itens.reduce((s, id) => s + (plano.series[id] || 3), 0);
+  const min = Math.max(5, Math.round(itens.reduce((s, id) => s + (plano.series[id] || 3) * (40 + descansoDe(id)), 0) / 60 / 5) * 5);
+  const prox = itens.find(id => !feitos.has(id));
+
+  let txt, acao;
+  if (andamento) {
+    txt = `<div class="kicker azul">Em andamento</div><div class="titulo">${esc(t.nome)}</div>
+      <div class="ink2">${nFeitos} de ${plural(itens.length, 'exercício', 'exercícios')}</div>`;
+    acao = prox
+      ? `<button class="grande larga" id="bt-comecar">${ic('play-fill')}Continuar: ${esc(movMap[exMap[prox].mov].nome)}</button>`
+      : `<div class="vazio">${ic('flag-checkered', 'ic-24')}<div><div>Treino completo</div><div class="mudo">Salve como rotina ou escolha mais um exercício por grupo.</div></div></div>`;
+  } else {
+    const rec = e.pct >= 85 ? tagRecup(e.pct, 'Recuperado') : tagRecup(e.pct);
+    txt = `<div class="kicker azul">${escolhidoOuSug(e)}</div><div class="titulo">${esc(t.nome)}</div>
+      <div class="ink2">${esc(t.det)}</div>
+      <div class="hero-meta">${rec}<span class="mudo">${e.ultTs ? `último: ${dataCurta(e.ultTs)}` : 'primeira vez'}</span></div>`;
+    acao = `<button class="grande larga" id="bt-comecar">${ic('play-fill')}Começar ${esc(t.nome)}</button>
+      <div class="hero-rod">${plural(itens.length, 'exercício', 'exercícios')} · ${nSeries} séries · cerca de ${min} min</div>`;
+  }
+  el.innerHTML = `<div class="card hero" id="card-dia">
+    <div class="hero-top"><div class="hero-txt">${txt}</div><span class="hero-corpo">${corpoMini(t.musculos)}</span></div>
+    ${andamento ? tilesHoje() : ''}
+    <div class="plano"><div class="plano-cab"><span>${plano.ts ? `Plano · repete ${dataCurta(plano.ts)}` : 'Plano sugerido'}</span><span>${andamento ? 'hoje' : 'alvo de hoje'}</span></div>${linhas}</div>
+    <div class="hero-acao">${acao}</div></div>`;
+  const bt = $('bt-comecar');
+  if (bt) bt.onclick = () => comecarTreino(t, itens);
+}
+const escolhidoOuSug = e => (treinoEscolha === e.t.id && e.pct < 60 ? 'Treinar mesmo assim' : 'Hoje é dia de');
+
+function tilesHoje() {
+  const sets = logs.filter(l => dayKey(l.ts) === hojeKey()).flatMap(l => l.sets);
+  const vol = sets.reduce((s, x) => s + x.peso * x.reps, 0);
+  let duracao = '–';
+  if (sets.length > 1) {
+    const ini = Math.min(...sets.map(s => s.ts - (s.dur || 0) * 1000)), fim = Math.max(...sets.map(s => s.ts));
+    const min = Math.round((fim - ini) / 6e4);
+    duracao = min >= 60 ? `${Math.floor(min / 60)}h${String(min % 60).padStart(2, '0')}` : `${Math.max(1, min)} <small>min</small>`;
+  }
+  return `<div class="tiles" id="tiles-hoje">${tile(sets.length, 'séries')}${tile(`${kg(vol)} <small>kg</small>`, 'volume')}${tile(duracao, 'duração')}</div>`;
+}
+
+function renderOutros(outros) {
+  if (!outros.length) return;
+  $('sec-outros').hidden = false;
+  $('outros-treinos').innerHTML = outros.map(x => `<button class="linha-lista" data-treino="${x.t.id}" style="min-height:68px;padding-left:12px">
+      ${corpoMini(x.t.musculos)}
+      <span class="ll-txt"><span class="ll-nome" style="font-size:17px">${esc(x.t.nome)}</span><span class="ll-det">${esc(x.t.curto)} · ${x.hoje ? 'hoje' : esc(haQuanto(x.ultTs))}</span></span>
+      ${tagRecup(x.pct)}${ic('caret-right', 'chev')}</button>`).join('');
+  $('outros-treinos').querySelectorAll('[data-treino]').forEach(b => b.onclick = () => escolherTreino(b.dataset.treino));
+}
+
+function escolherTreino(id) {
+  treinoEscolha = id;
+  renderDia();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// E2: nenhum treino recuperado (todos < 60%)
+function renderDescanso(el, est) {
+  const ord = est.map(e => ({ ...e, h: horasTreino(e) })).sort((a, b) => a.h - b.h);
+  const semana = semanaKey(Date.now());
+  const daSemana = logs.filter(l => semanaKey(l.ts) === semana);
+  const prs = daSemana.filter(l => l.pr || l.sets.some(s => s.pr)).length;
+  el.innerHTML = `<div class="tela justa"><div class="card" style="display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;gap:12px;align-items:flex-start">${ic('moon-fill', 'ic-30 c-azul')}
+        <div><div class="titulo-2">Dia de descanso</div><div class="mudo">Os três treinos ainda estão se recuperando. ${esc(ord[0].t.nome)} fica ${esc(txtHoras(ord[0].h))}.</div></div></div>
+      <div class="lista" style="background:var(--c-elev)">${ord.map(x => `<button class="linha-lista" data-treino="${x.t.id}">
+        ${corpoMini(x.t.musculos)}<span class="ll-txt"><span class="ll-nome">${esc(x.t.nome)}</span><span class="ll-det">${esc(txtHoras(x.h))}${x.ultTs ? ` · ${esc(haQuanto(x.ultTs))}` : ''}</span></span>
+        ${tagRecup(x.pct)}</button>`).join('')}</div>
+      <button class="ghost" id="bt-mesmo-assim">Treinar mesmo assim</button></div>
+    <div class="secao"><div class="kicker">Esta semana</div><div class="tiles">
+      ${tile(new Set(daSemana.map(l => dayKey(l.ts))).size, 'treinos')}${tile(daSemana.reduce((s, l) => s + l.sets.length, 0), 'séries')}${tile(`${prs}${ic('trophy-fill')}`, 'recordes')}</div></div></div>`;
+  el.querySelectorAll('[data-treino]').forEach(b => b.onclick = () => escolherTreino(b.dataset.treino));
+  $('bt-mesmo-assim').onclick = () => escolherTreino(ord[0].t.id);
+}
+
+// E1: primeiro uso — escolhe um dos três treinos e explica o fluxo
+let primeiroEscolha = 'empurrar';
+function renderPrimeiroUso(el) {
+  const t = TREINOS.find(x => x.id === primeiroEscolha);
+  el.innerHTML = `<div class="tela justa"><div class="card hero">
+      <div class="hero-txt"><div class="kicker azul">Primeiro treino</div><div class="titulo-2">Qual é o treino de hoje?</div>
+        <div class="mudo">Depois do primeiro registro, o Carga sugere o próximo pela sua recuperação.</div></div>
+      <div class="opcoes-treino" role="radiogroup" aria-label="Treino">${TREINOS.map(x => `<button class="op-treino" role="radio" aria-checked="${x.id === t.id}" data-op="${x.id}">
+        ${corpoMini(x.musculos)}<span class="ll-txt"><span class="ll-nome" style="font-size:17px">${esc(x.nome)}</span><span class="ll-det">${esc(x.det)}</span></span>${ic('check-circle-fill', 'ic-22')}</button>`).join('')}</div>
+      <div class="hero-acao"><button class="grande larga" id="bt-comecar">${ic('play-fill')}Começar ${esc(t.nome)}</button>
+        <button class="btn-texto" id="bt-por-grupo">Prefiro escolher por grupo muscular</button></div></div>
+    <div class="card como"><div class="kicker">Como funciona</div>
+      <div class="como-it">${ic('barbell')}<div><b>Anote carga × repetições</b><span>Cada variação guarda a própria carga e sugere o alvo da próxima vez.</span></div></div>
+      <div class="como-it">${ic('timer')}<div><b>O descanso conta sozinho</b><span>Vibra e toca um bipe quando for hora da próxima série.</span></div></div>
+      <div class="como-it">${ic('person-arms-spread')}<div><b>Veja o que já recuperou</b><span>A aba Músculos estima a recuperação de cada grupo.</span></div></div></div></div>`;
+  el.querySelectorAll('[data-op]').forEach(b => b.onclick = () => { primeiroEscolha = b.dataset.op; renderPrimeiroUso(el); });
+  $('bt-comecar').onclick = () => comecarTreino(t, planoTreino(t, {}).itens);
+  $('bt-por-grupo').onclick = () => $('sec-grupos').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ---------- repetir o último treino de um grupo (lista do grupo) ----------
 // último treino de um grupo: exercícios do dia mais recente, na ordem em que foram feitos
 function ultimoTreinoGrupo(grupo) {
   const doGrupo = logs.filter(l => exMap[l.ex] && exMap[l.ex].cat === grupo && dayKey(l.ts) !== hojeKey());
@@ -97,54 +250,4 @@ function repetirTreino(grupo) {
   ativo.rotina = 'rep';
   ativo.rotinaTemp = { id: 'rep', nome: `${nomeGrupo(grupo)} de ${dataBr(u.ts)}`, itens: u.itens };
   abrirExercicio(u.itens.find(id => !feitos.has(id)) || u.itens[0]);
-}
-
-const haQuanto = ts => { if (!ts) return 'nunca'; const q = quando(ts); return q === dataBr(ts) ? `em ${q}` : q; };
-
-function renderSugestoes() {
-  const el = $('sugestoes');
-  if (!logs.length) {
-    el.innerHTML = '<p class="mudo">Sem histórico ainda — escolha um grupo abaixo e registre seu primeiro exercício; as sugestões aparecem aqui.</p>';
-    return;
-  }
-  const rod = rodizioGrupos();
-  const sug = escolheSugerido(rod);
-  const hoje = rod.filter(x => x.hoje);
-  let html = '';
-  if (hoje.length) {
-    // treino em andamento: o que falta finalizar na região do dia (modelo por músculo)
-    const { grupos, regiao, completa } = sugerirTreino();
-    html += `<p class="ink2" style="margin-bottom:8px">🎯 Hoje: <b>${esc(hoje.map(x => nomeGrupo(x.g.id)).join(' + '))}</b>${regiao && !completa ? ' — falta finalizar:' : regiao ? ' — região finalizada ✅' : ''}</p>`;
-    if (regiao && !completa) for (const g of grupos) {
-      const gasto = g.sti > 0.2 ? ` · já ${nivelSti(g.sti)}` : '';
-      html += `<div class="grupo-sug"><div class="titulo">${esc(g.m.nome)}${gasto}</div><div class="chips">`
-        + g.exs.map(e => `<button class="chip" data-ex="${e.id}"><b>+</b> ${esc(e.nome)}</button>`).join('') + '</div></div>';
-    }
-  }
-  if (sug) {
-    const u = ultimoTreinoGrupo(sug.g.id);
-    html += `<button class="sug-principal" data-abre-grupo="${esc(sug.g.id)}">
-        ${corpoMini(sug.g.musculos)}
-        <span class="sp-txt"><span class="sp-rot">${hoje.length ? 'Próximo no rodízio' : 'Hoje é dia de'}</span>
-        <span class="sp-nome">${esc(nomeGrupo(sug.g.id))}</span>
-        <span class="sp-det">último treino: ${esc(haQuanto(sug.ult))} · ${sug.pior.pct >= 85 ? 'recuperado ✅' : `${esc(nomeCurto(sug.pior.m))} ${sug.pior.pct}%`}</span></span>
-        <span class="sp-seta">›</span></button>
-      ${u ? `<button class="ghost larga" data-repetir="${esc(sug.g.id)}" style="margin-top:8px">🔁 Repetir o treino de ${dataBr(u.ts)} (${u.itens.length} exercício${u.itens.length > 1 ? 's' : ''})</button>` : ''}`;
-  } else if (!hoje.length) {
-    html += '<p class="mudo">Todos os grupos estão em recuperação — descanso também é treino 😴</p>';
-  }
-  const outros = rod.filter(x => x !== sug && !x.hoje);
-  if (outros.length) {
-    html += `<div class="titulo mudo" style="margin:12px 0 6px;font-size:.8rem">Ou escolha outro grupo (do mais antigo ao mais recente):</div><div class="chips">`
-      + outros.map(x => `<button class="chip${x.pior.pct < 60 ? ' fatigado' : ''}" data-abre-grupo="${esc(x.g.id)}">${esc(nomeGrupo(x.g.id))} <small>${esc(haQuanto(x.ult))}${x.pior.pct < 60 ? ' · ⏳' : ''}</small></button>`).join('')
-      + '</div>';
-  }
-  el.innerHTML = html;
-  bindChips(el);
-  el.querySelectorAll('[data-abre-grupo]').forEach(b => b.onclick = () => {
-    if (emSerie()) return toast('Termine ou cancele a série atual primeiro.');
-    ativo.grupo = b.dataset.abreGrupo; ativo.ex = null; ativo.vista = 'ex';
-    salvaAtivo(); renderTreinar(); rolarPara('card-treinar');
-  });
-  el.querySelectorAll('[data-repetir]').forEach(b => b.onclick = () => repetirTreino(b.dataset.repetir));
 }

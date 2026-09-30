@@ -31,17 +31,22 @@ function tendencia(pts) {
   const base = (janela.length >= 2 ? janela : pts.slice(-8))[0], ult = pts[pts.length - 1];
   return base.y && base !== ult ? Math.round((ult.y / base.y - 1) * 100) : null;
 }
-const setaTend = t => t == null ? '' : t >= 2 ? `<span class="t-sobe">↗ +${t}%</span>`
-  : t <= -2 ? `<span class="t-desce">↘ −${-t}%</span>` : '<span class="t-igual">→ estável</span>';
+// tendência com ícone + texto (nunca só cor); "parado" = estagnado
+function tendHtml(t, parado) {
+  if (parado) return `<span class="tend t-parado">${ic('arrow-right')}parado</span>`;
+  if (t == null) return '';
+  return t >= 2 ? `<span class="tend t-sobe">${ic('arrow-up-right')}${t}%</span>`
+    : t <= -2 ? `<span class="tend t-desce">${ic('arrow-down-right')}${-t}%</span>` : `<span class="tend t-igual">${ic('arrow-right')}estável</span>`;
+}
 
 function sparkline(pts) {
   const p = pts.slice(-12);
-  if (p.length < 2) return '<svg class="spark" width="72" height="22"></svg>';
-  const W = 72, H = 22, ys = p.map(q => q.y), y0 = Math.min(...ys), dy = Math.max(...ys) - y0 || 1;
+  if (p.length < 2) return '<svg class="spark" width="64" height="24"></svg>';
+  const W = 64, H = 24, ys = p.map(q => q.y), y0 = Math.min(...ys), dy = Math.max(...ys) - y0 || 1;
   const X = i => 3 + i / (p.length - 1) * (W - 6), Y = v => H - 4 - (v - y0) / dy * (H - 8);
   return `<svg class="spark" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">
-    <path d="${p.map((q, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(q.y).toFixed(1)}`).join('')}" fill="none" stroke="var(--azul)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
-    <circle cx="${X(p.length - 1).toFixed(1)}" cy="${Y(p[p.length - 1].y).toFixed(1)}" r="2.6" fill="var(--azul)"/></svg>`;
+    <path d="${p.map((q, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(q.y).toFixed(1)}`).join('')}" fill="none" stroke="var(--azul)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${X(p.length - 1).toFixed(1)}" cy="${Y(p[p.length - 1].y).toFixed(1)}" r="2.5" fill="var(--azul)"/></svg>`;
 }
 
 // séries por semana (8 semanas) de um grupo — barras; a semana atual fica mais clara (ainda em andamento)
@@ -54,15 +59,18 @@ function graficoSemanas(el, grupo) {
     if (k in cont && (grupo === 'Todos' || (e && e.cat === grupo))) cont[k] += l.sets.length;
   }
   const vals = semanas.map(k => cont[k]), max = Math.max(4, ...vals);
-  const W = el.clientWidth || 330, H = 118, mt = 16, mb = 18, gap = 6, bw = (W - gap * 7) / 8;
+  const W = el.clientWidth || 326, H = 150, mt = 20, mb = 24, gap = 8, bw = (W - gap * 7) / 8;
   const Y = v => mt + (1 - v / max) * (H - mt - mb);
-  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block" role="img" aria-label="Séries por semana">
-    <line x1="0" x2="${W}" y1="${H - mb}" y2="${H - mb}" stroke="var(--grade)"/>
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block" role="img" aria-label="Séries por semana nas últimas 8 semanas: ${vals.join(', ')}">
+    <line x1="0" x2="${W}" y1="${H - mb}" y2="${H - mb}" stroke="#3a3a37"/>
+    <line x1="0" x2="${W}" y1="${Y(max / 2).toFixed(1)}" y2="${Y(max / 2).toFixed(1)}" stroke="var(--c-elev)"/>
     ${vals.map((v, i) => {
       const x = i * (bw + gap), atual = i === 7;
-      return `${v ? `<rect x="${x.toFixed(1)}" y="${Y(v).toFixed(1)}" width="${bw.toFixed(1)}" height="${(H - mb - Y(v)).toFixed(1)}" rx="3" fill="var(--azul)"${atual ? ' fill-opacity=".55"' : ''}/>
-        <text x="${(x + bw / 2).toFixed(1)}" y="${(Y(v) - 4).toFixed(1)}" text-anchor="middle" fill="var(--ink2)" font-size="10">${v}</text>` : ''}
-        ${i % 2 === 1 || atual ? `<text x="${(x + bw / 2).toFixed(1)}" y="${H - 5}" text-anchor="middle" fill="var(--mudo)" font-size="9">${atual ? 'esta' : dataBr(new Date(semanas[i] + 'T12:00').getTime())}</text>` : ''}`;
+      const barra = atual
+        ? `<rect x="${(x + 0.5).toFixed(1)}" y="${Y(v).toFixed(1)}" width="${(bw - 1).toFixed(1)}" height="${Math.max(0, H - mb - Y(v) - 0.5).toFixed(1)}" rx="5" fill="rgba(57,135,229,.18)" stroke="var(--acao)" stroke-dasharray="3 3"/>`
+        : `<rect x="${x.toFixed(1)}" y="${Y(v).toFixed(1)}" width="${bw.toFixed(1)}" height="${(H - mb - Y(v)).toFixed(1)}" rx="5" fill="var(--acao)"/>`;
+      return `${v ? `${barra}<text x="${(x + bw / 2).toFixed(1)}" y="${(Y(v) - 6).toFixed(1)}" text-anchor="middle" fill="var(--t-2)" font-size="12" font-weight="500">${v}</text>` : ''}
+        ${i % 2 === 1 || atual ? `<text x="${(x + bw / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle" fill="var(--t-3)" font-size="12">${atual ? 'esta' : dataBr(new Date(semanas[i] + 'T12:00').getTime())}</text>` : ''}`;
     }).join('')}</svg>`;
   return vals;
 }
@@ -74,23 +82,22 @@ function renderEvolucao(el, grupo) {
   const ult = {};
   logs.forEach(l => { ult[l.ex] = Math.max(ult[l.ex] || 0, l.ts); });
   exs.sort((a, b) => ult[b] - ult[a]);
-  el.innerHTML = `<div class="tiles evo-tiles"></div>
-    <h3>Séries por semana${grupo === 'Todos' ? '' : ` — ${esc(nomeGrupo(grupo))}`}</h3><div class="evo-sem"></div>
+  el.innerHTML = `<div class="card card-graf"><div class="card-cab"><h3>Séries por semana</h3><div class="mudo evo-media"></div></div><div class="evo-sem"></div></div>
     ${volumeMusculos(grupo)}
-    <h3 style="margin-top:14px">Exercícios <span class="mudo" style="font-weight:400">— toque para ver o gráfico</span></h3>
+    <div class="card evo-card"><div class="card-cab"><h3>Evolução por exercício</h3><div class="mudo">força estimada (e1RM) nos últimos 60 dias · toque para ver o gráfico</div></div>
     <div class="evo-lista">${exs.length ? exs.map(id => {
       const ex = exMap[id], { pts } = pontosEx(id);
       const doEx = logs.filter(l => l.ex === id), l = doEx.reduce((a, b) => b.ts > a.ts ? b : a), top = melhorSerie(l.sets);
+      const tend = tendHtml(tendencia(pts), !!estagnacao(id)) || '<span class="tend t-igual">—</span>';
       return `<div class="evo-item${evoAberto === id ? ' aberto' : ''}">
-        <button class="evo-cab" data-evo="${id}"><div class="evo-info"><div class="evo-nome">${esc(ex.nome)}</div>
-          <div class="det">${esc(carga(top.peso))} × ${esc(repsCurto(top, ex.seg))} · ${quando(l.ts)} · ${pts.length} sess${pts.length > 1 ? 'ões' : 'ão'}${estagnacao(id) ? ' · <span class="aviso">⏸ estagnado</span>' : ''}</div></div>
-          ${sparkline(pts)}<div class="evo-t">${setaTend(tendencia(pts)) || '<span class="t-igual">—</span>'}</div></button>
+        <button class="evo-cab" data-evo="${id}" aria-expanded="${evoAberto === id}"><div class="evo-info"><div class="evo-nome">${esc(ex.nome)}</div>
+          <div class="det">${esc(carga(top.peso))} × ${esc(repsCurto(top, ex.seg))} · ${quando(l.ts)}</div></div>
+          ${sparkline(pts)}<div class="evo-t">${tend}</div>${ic('caret-down', 'ic-18 ic-caret')}</button>
         ${evoAberto === id ? '<div class="evo-det"></div>' : ''}</div>`;
-    }).join('') : '<p class="mudo">Nenhum exercício registrado aqui ainda — o histórico aparece depois do primeiro treino.</p>'}</div>`;
+    }).join('') : '<p class="mudo" style="padding:0 16px 16px">Nenhum exercício registrado aqui ainda. O histórico aparece depois do primeiro treino.</p>'}</div></div>`;
   const vals = graficoSemanas(el.querySelector('.evo-sem'), grupo);
   const media = Math.round(vals.slice(3, 7).reduce((a, b) => a + b, 0) / 4 * 10) / 10;
-  const ultimo = Math.max(0, ...exs.map(id => ult[id]));
-  el.querySelector('.evo-tiles').innerHTML = tile(vals[7], 'séries nesta semana') + tile(num(media), 'média/semana (4 sem.)') + tile(ultimo ? quando(ultimo) : '–', 'último treino');
+  el.querySelector('.evo-media').textContent = `média de ${num(media)} nas últimas 4 · semana atual tracejada`;
   el.querySelectorAll('[data-evo]').forEach(b => b.onclick = () => {
     evoAberto = evoAberto === b.dataset.evo ? null : b.dataset.evo;
     renderEvolucao(el, grupo);
@@ -112,24 +119,24 @@ function detalheExercicio(el, exId, comBotao) {
   const sessoes = porDia.length;
   const un = ex.seg ? ' s' : ' reps';
   const t = tendencia(pts);
-  el.innerHTML = `<div class="tiles" style="margin:8px 0 4px">${corporal
+  el.innerHTML = `<div class="tiles">${corporal
     ? tile(Math.max(...sets.map(s => s.reps)) + un, 'melhor série') + tile(sets.length, 'séries') + tile(sessoes, 'sessões')
     : tile(num(Math.max(...sets.map(s => s.peso))) + ' kg', 'melhor carga') + tile(kg(melhorE1rm(exId)) + ' kg', 'melhor e1RM') + tile(sessoes, 'sessões')}</div>
-    ${t != null ? `<p class="mudo">Tendência (últimos 60 dias): ${setaTend(t)}</p>` : ''}
+    ${t != null ? `<p class="mudo">Tendência (últimos 60 dias): ${tendHtml(t)}</p>` : ''}
     ${ladoFraco(sets)}
     ${estagnacao(exId) ? avisoEstagnacao(ex) : ''}
-    <h3>${corporal ? `Melhor série (${un.trim()})` : 'Força estimada (e1RM, kg)'}</h3><div class="grafico g1"></div>
-    <h3>${corporal ? `Total por treino (${un.trim()})` : 'Volume por treino (kg)'}</h3><div class="grafico g2"></div>
-    <h3>Últimas sessões</h3>
+    <h4>${corporal ? `Melhor série (${un.trim()})` : 'Força estimada (e1RM, kg)'}</h4><div class="grafico g1"></div>
+    <h4>${corporal ? `Total por treino (${un.trim()})` : 'Volume por treino (kg)'}</h4><div class="grafico g2"></div>
+    <h4>Últimas sessões</h4><div>
     ${doEx.slice().sort((a, b) => b.ts - a.ts).slice(0, 5).map(l => {
       const tut = l.sets.reduce((a, s) => a + (s.dur || 0), 0);
       const q = quando(l.ts);
-      return `<div class="sessao"><div class="cab"><b>${dataBr(l.ts)}</b> <span class="mudo">${q !== dataBr(l.ts) ? `· ${q} ` : ''}· ${l.sets.length} série${l.sets.length > 1 ? 's' : ''}${tut ? ` · ⏱ ${mmss(tut)}` : ''}</span></div>
+      return `<div class="sessao"><div class="cab"><b>${dataBr(l.ts)}</b> <span class="mudo">${q !== dataBr(l.ts) ? `· ${q} ` : ''}· ${l.sets.length} série${l.sets.length > 1 ? 's' : ''}${tut ? ` · tempo ${mmss(tut)}` : ''}</span></div>
         <div class="pills">${l.sets.map(s => `<span class="pill">${esc(carga(s.peso))} × ${esc(repsCurto(s, ex.seg))}${s.dur && !ex.seg ? ` · ${mmss(s.dur)}` : ''}${s.rir != null ? ` · <span class="rir r${Math.min(s.rir, 4)}">${rirTxt(s.rir)}</span>` : ''}</span>`).join('')}</div></div>`;
-    }).join('')}
-    ${comBotao ? `<button class="ghost larga" data-treinar="${exId}">🏋️ Treinar ${esc(ex.nome)}</button>` : ''}`;
+    }).join('')}</div>
+    ${comBotao ? `<button class="ghost larga" style="margin-top:0" data-treinar="${exId}">${ic('barbell')}Treinar ${esc(ex.nome)}</button>` : ''}`;
   const fmt = corporal ? v => kg(v) + un : v => kg(v) + ' kg';
-  graficoLinha(el.querySelector('.g1'), pts, 'var(--azul)', fmt);
+  graficoLinha(el.querySelector('.g1'), pts, 'var(--azul)', fmt, true);
   graficoLinha(el.querySelector('.g2'), porDia.map(p => ({ x: p.x, y: corporal ? p.totReps : p.vol })), 'var(--aqua)', fmt);
   const bt = el.querySelector('[data-treinar]');
   if (bt) bt.onclick = () => abrirExercicio(exId);
@@ -142,11 +149,11 @@ function renderProgresso() {
   const dias30 = new Set(logs.filter(l => l.ts >= d30).map(l => dayKey(l.ts))).size;
   const vol7 = logs.filter(l => l.ts >= d7).reduce((s, l) => s + volumeLog(l), 0);
   const prs = logs.filter(l => l.pr || l.sets.some(s => s.pr)).length;
-  $('tiles-gerais').innerHTML =
-    tile(dias30, 'treinos (30 dias)') + tile(kg(vol7) + ' kg', 'volume (7 dias)') + tile(prs, 'recordes (PR)');
+  const volTxt = vol7 >= 1000 ? `${num(Math.round(vol7 / 100) / 10)} <small>t</small>` : `${kg(vol7)} <small>kg</small>`;
+  $('tiles-gerais').innerHTML = tile(dias30, 'treinos · 30 d') + tile(volTxt, 'volume · 7 d') + tile(`${prs}${ic('trophy-fill')}`, 'recordes');
   const grupos = ['Todos', ...gruposVisiveis().map(g => g.id)];
   if (!grupos.includes(progGrupo)) progGrupo = 'Todos';
-  $('prog-grupos').innerHTML = grupos.map(g => `<button class="chip${g === progGrupo ? ' sel' : ''}" data-pg="${esc(g)}">${esc(nomeGrupo(g))}</button>`).join('');
+  $('prog-grupos').innerHTML = grupos.map(g => `<button class="chip" role="radio" aria-checked="${g === progGrupo}" data-pg="${esc(g)}">${esc(nomeGrupo(g))}</button>`).join('');
   $('prog-grupos').querySelectorAll('[data-pg]').forEach(b => b.onclick = () => { progGrupo = b.dataset.pg; evoAberto = null; renderProgresso(); });
   renderEvolucao($('prog-evo'), progGrupo);
 }
@@ -155,18 +162,20 @@ const tile = (valor, rotulo) => `<div class="tile"><div class="valor">${valor}</
 
 // gráfico de linha SVG: marca fina 2px, marcadores 8px com anel da superfície,
 // grade recessiva, tooltip + crosshair no toque/hover (specs do guia de dataviz)
-function graficoLinha(el, pontos, cor, fmt) {
+function graficoLinha(el, pontos, cor, fmt, marcaRecorde) {
   el.innerHTML = '';
   if (pontos.length < 2) {
     el.innerHTML = '<p class="mudo">Registre este exercício em pelo menos 2 dias para ver o gráfico.</p>';
     return;
   }
-  const W = el.clientWidth || 500, H = 180, ml = 44, mr = 12, mt = 10, mb = 20;
+  const W = el.clientWidth || 326, H = 160, mr = 10, mt = 12, mb = 22;
   const xs = pontos.map(p => p.x), ys = pontos.map(p => p.y);
   const x0 = Math.min(...xs), x1 = Math.max(...xs);
   let y0 = Math.min(...ys), y1 = Math.max(...ys);
   if (y0 === y1) { y0 = Math.max(0, y0 - 1); y1 += 1; }
   else { const pad = (y1 - y0) * 0.12; y0 = Math.max(0, y0 - pad); y1 += pad; }
+  // margem esquerda do tamanho do maior rótulo do eixo (≈ 7 px por caractere a 12 px)
+  const ml = 14 + 7 * Math.max(...[0, 1, 2].map(i => fmt(y0 + (y1 - y0) * i / 2).replace(/ (kg|reps|s)$/, '').length));
   const X = t => ml + (t - x0) / (x1 - x0) * (W - ml - mr);
   const Y = v => mt + (1 - (v - y0) / (y1 - y0)) * (H - mt - mb);
 
@@ -184,12 +193,12 @@ function graficoLinha(el, pontos, cor, fmt) {
   for (let i = 0; i <= 2; i++) {
     const v = y0 + (y1 - y0) * i / 2, y = Y(v);
     add('line', { x1: ml, x2: W - mr, y1: y, y2: y, stroke: 'var(--grade)', 'stroke-width': 1 });
-    const t = add('text', { x: ml - 6, y: y + 3, 'text-anchor': 'end', fill: 'var(--mudo)', 'font-size': 10 });
+    const t = add('text', { x: ml - 8, y: y + 4, 'text-anchor': 'end', fill: 'var(--mudo)', 'font-size': 12 });
     t.textContent = fmt(v).replace(/ (kg|reps|s)$/, '');
   }
   // rótulos do eixo x (primeira e última data)
   [[pontos[0], 'start'], [pontos[pontos.length - 1], 'end']].forEach(([p, anchor]) => {
-    const t = add('text', { x: X(p.x), y: H - 6, 'text-anchor': anchor, fill: 'var(--mudo)', 'font-size': 10 });
+    const t = add('text', { x: X(p.x), y: H - 4, 'text-anchor': anchor, fill: 'var(--mudo)', 'font-size': 12 });
     t.textContent = dataBr(p.x);
   });
   // crosshair (escondido até o hover)
@@ -199,12 +208,14 @@ function graficoLinha(el, pontos, cor, fmt) {
     d: pontos.map((p, i) => `${i ? 'L' : 'M'}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join(''),
     fill: 'none', stroke: cor, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round',
   });
-  pontos.forEach(p => add('circle', { cx: X(p.x), cy: Y(p.y), r: 4, fill: cor, stroke: 'var(--card)', 'stroke-width': 2 }));
+  const rec = marcaRecorde ? pontos.reduce((a, p) => (p.y >= a.y ? p : a)) : null; // recorde em âmbar, com legenda
+  pontos.forEach(p => add('circle', { cx: X(p.x), cy: Y(p.y), r: p === rec ? 6 : 4, fill: p === rec ? 'var(--pr)' : cor, stroke: 'var(--card)', 'stroke-width': 2 }));
 
   const tip = document.createElement('div');
   tip.className = 'tip';
   el.appendChild(svg);
   el.appendChild(tip);
+  if (rec) el.insertAdjacentHTML('beforeend', `<div class="mudo" style="display:flex;align-items:center;gap:6px;font-size:12px;margin-top:6px"><span class="ponto" style="width:10px;height:10px;background:var(--pr)"></span>recorde · ${fmt(rec.y)} em ${dataBr(rec.x)}</div>`);
 
   const mover = ev => {
     const r = svg.getBoundingClientRect();
@@ -229,8 +240,8 @@ function ladoFraco(sets) {
   const uni = sets.filter(s => s.repsE != null);
   if (uni.length < 2) return '';
   const dif = uni.reduce((t, s) => t + (s.repsE - s.repsD), 0) / uni.length;
-  if (Math.abs(dif) < 0.5) return '<p class="mudo">↔ Lados equilibrados nas séries por lado.</p>';
-  return `<p class="mudo">↔ Lado mais fraco: <b class="aviso">${dif < 0 ? 'esquerdo' : 'direito'}</b> (${num(Math.abs(+dif.toFixed(1)))} rep a menos em média) — comece pelo lado mais fraco e iguale as reps do outro.</p>`;
+  if (Math.abs(dif) < 0.5) return '<p class="mudo">Lados equilibrados nas séries por lado.</p>';
+  return `<p class="mudo">Lado mais fraco: <b class="c-atencao">${dif < 0 ? 'esquerdo' : 'direito'}</b> (${num(Math.abs(+dif.toFixed(1)))} rep a menos em média) — comece pelo lado mais fraco e iguale as reps do outro.</p>`;
 }
 
 // séries efetivas por músculo nos últimos 7 dias × faixa de referência para hipertrofia (10–20/semana)
@@ -245,13 +256,12 @@ function volumeMusculos(grupo) {
     for (const [m, f] of Object.entries(exMap[l.ex].musculos)) if (m in cont) cont[m] += l.sets.length * (f >= 0.4 ? 1 : f >= 0.15 ? 0.5 : 0);
   }
   const [lo, hi] = FAIXA_SEMANAL, max = 26, pct = v => Math.min(100, v / max * 100);
-  return `<h3 style="margin-top:14px">Séries por músculo <span class="mudo" style="font-weight:400">— últimos 7 dias</span></h3>
+  return `<div class="card card-graf"><div class="card-cab"><h3>Séries por músculo · 7 dias</h3><div class="mudo">Faixa verde = ${lo}–${hi} séries/semana (hipertrofia). Séries em que o músculo só ajuda contam ½.</div></div>
     <div class="vm-lista">${lista.map(m => {
       const v = Math.round(cont[m] * 2) / 2;
-      const cor = v < lo ? 'var(--atencao)' : v <= hi ? 'var(--bom)' : 'var(--serio)';
+      const [cor, st] = v < lo ? ['var(--atencao)', 'abaixo'] : v <= hi ? ['var(--ok)', 'na faixa'] : ['var(--serio)', 'acima'];
       return `<div class="vm"><span class="vm-nome">${esc(nomeCurto(m))}</span>
         <div class="vm-barra"><div class="vm-faixa" style="left:${pct(lo)}%;width:${pct(hi) - pct(lo)}%"></div><div class="vm-val" style="width:${pct(v)}%;background:${cor}"></div></div>
-        <span class="vm-num" style="color:${cor}">${num(v)}</span></div>`;
-    }).join('')}</div>
-    <p class="mudo" style="font-size:.72rem;margin-top:4px">Faixa clara = ${lo}–${hi} séries/semana, referência comum para hipertrofia. Séries diretas contam 1; as em que o músculo só ajuda contam ½.</p>`;
+        <span class="vm-num">${num(v)}</span><span class="vm-st" style="color:${cor}">${st}</span></div>`;
+    }).join('')}</div></div>`;
 }

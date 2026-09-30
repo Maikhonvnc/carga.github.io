@@ -52,17 +52,20 @@ async function novaPagina(browser, base, dados) {
     // 2) série cronometrada com esforço → descanso automático
     ok(await pg.locator('[data-grupo="Peito"] .corpo-mini image').count() === 2 && await pg.locator('[data-grupo="Peito"] .corpo-mini path').count() > 0, 'ícones dos grupos no desenho realista');
     await pg.click('[data-grupo="Peito"]');
-    await pg.click('.mov .chip[data-ex="supino_reto"]');
+    await pg.click('.mov[data-ex="supino_reto"]');
     const mapa = await pg.evaluate(() => ({ imgs: document.querySelectorAll('.p-mapa .mapa-foco image').length, acesos: document.querySelectorAll('.p-mapa .mapa-foco path[fill="#ff1a1a"]').length }));
     ok(mapa.imgs === 2 && mapa.acesos > 0, 'desenho realista acende o foco em vermelho');
     await pg.click('#bt-iniciar');
+    ok(await pg.isVisible('#serie-tela #crono') && !(await pg.isVisible('#dock')), 'série abre em tela cheia com o cronômetro');
     await pg.waitForTimeout(1200);
     await pg.click('#bt-parar');
     await pg.click('[data-rir="2"]');
     await pg.click('#bt-salvar-serie');
     const s = await pg.evaluate(() => logHoje('supino_reto').sets[0]);
     ok(s.dur >= 1 && s.rir === 2 && s.reps === 11, 'salva série com duração, esforço e alvo (+1 rep)');
-    ok(await pg.isVisible('#barra-treino'), 'descanso começa sozinho');
+    ok(await pg.isVisible('#anel') && (await pg.textContent('#bt-iniciar-fs')).includes('série 2'), 'descanso começa sozinho, com a próxima série na base');
+    await pg.click('#bt-minimizar');
+    ok(await pg.isVisible('#barra-treino') && await pg.isVisible('#dock'), 'minimizar volta ao painel com o descanso na barra');
     ok(!pg.erros.length, 'sem erros de página (fluxo de série) ' + pg.erros.join(' | '));
   }
 
@@ -76,12 +79,17 @@ async function novaPagina(browser, base, dados) {
         { id: 4, ex: 'puxada_frontal', ts: agora - 2 * D, sets: [{ peso: 50, reps: 10, ts: agora - 2 * D }] },
       ],
     });
-    ok((await pg.textContent('.sug-principal')).includes('Pernas'), 'sugere o grupo treinado há mais tempo (Pernas)');
-    ok(await pg.locator('#sugestoes .chip[data-abre-grupo]').count() >= 3, 'mostra os outros grupos ao lado');
-    await pg.click('[data-repetir="Pernas"]');
+    ok((await pg.textContent('#card-dia')).includes('Pernas'), 'sugere o treino feito há mais tempo (Pernas)');
+    ok(await pg.locator('#outros-treinos [data-treino]').count() === 2, 'mostra os outros dois treinos');
+    await pg.click('#bt-comecar');
     await pg.waitForTimeout(200);
-    ok(await pg.evaluate(() => ativo.ex === 'agachamento' && ativo.rotinaTemp.itens.join() === 'agachamento,leg_press'), 'repetir treino abre o 1º exercício daquele dia');
-    ok((await pg.textContent('#p-fim')).includes('Leg press'), 'oferece o próximo exercício do treino repetido');
+    ok(await pg.evaluate(() => ativo.ex === 'agachamento' && ativo.rotinaTemp.itens.join() === 'agachamento,leg_press'), 'começar o treino abre o 1º exercício do plano');
+    ok((await pg.textContent('#p-fim')).includes('Leg press'), 'oferece o próximo exercício do treino');
+    await pg.click('#bt-voltar');
+    await pg.click('#bt-voltar');
+    await pg.click('[data-grupo="Peito"]');
+    await pg.click('#bt-repetir');
+    ok(await pg.evaluate(() => ativo.ex === 'supino_reto'), 'repetir o treino do grupo abre o exercício daquele dia');
     ok(!pg.erros.length, 'sem erros de página (rodízio) ' + pg.erros.join(' | '));
   }
 
@@ -103,7 +111,8 @@ async function novaPagina(browser, base, dados) {
     ok(d[1].alvoReps === 12, 'sobraram reps na reserva → +2 reps');
     ok(d[2], 'detecta estagnação após 3 sessões sem recorde');
     await pg.click('[data-grupo="Pernas"]');
-    await pg.click('.mov .chip[data-ex="bulgaro_halteres"]');
+    await pg.click('.mov[data-mov="bulgaro"]');
+    await pg.click('[data-var="bulgaro_halteres"]');
     ok(await pg.isVisible('#f-repsE') && await pg.isVisible('#f-repsD'), 'variação unilateral mostra reps por lado');
     await pg.fill('#f-repsE', '8');
     await pg.dispatchEvent('#f-repsE', 'input');
@@ -147,20 +156,25 @@ async function novaPagina(browser, base, dados) {
   // 7) GIF do próprio usuário: salva por variação no aparelho, aparece no painel e pode ser removido
   {
     const pg = await novaPagina(browser, base, {});
+    ok(await pg.locator('.op-treino').count() === 3 && await pg.isVisible('#bt-comecar'), 'primeiro uso oferece os três treinos');
     await pg.click('[data-grupo="Ombros"]');
-    await pg.click('.mov .chip[data-ex="elevacao_lateral"]');
+    await pg.click('.mov[data-ex="elevacao_lateral"]');
     const gif = Buffer.from('R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs=', 'base64');
     await pg.setInputFiles('#input-gif-painel', { name: 'teste.gif', mimeType: 'image/gif', buffer: gif });
     await pg.waitForSelector('#anim-ex.gif img[src^="blob:"]');
-    ok(await pg.locator('#bt-gif-remover').count() === 1, 'GIF do usuário aparece no painel');
+    await pg.click('#bt-mais');
+    ok(await pg.locator('#folha button', { hasText: 'Remover GIF' }).count() === 1, 'GIF do usuário aparece no painel');
+    await pg.keyboard.press('Escape');
     await pg.reload();
     await pg.waitForTimeout(300);
-    if (!(await pg.locator('#anim-ex').isVisible())) await pg.click('.mov .chip[data-ex="elevacao_lateral"]').catch(() => {});
+    if (!(await pg.locator('#anim-ex').isVisible())) await pg.click('.mov[data-ex="elevacao_lateral"]').catch(() => {});
     await pg.waitForSelector('#anim-ex.gif img', { timeout: 3000 }).catch(() => {});
     ok(await pg.locator('#anim-ex.gif img').count() === 1, 'GIF continua salvo depois de recarregar');
-    await pg.click('#bt-gif-remover');
+    await pg.click('#bt-mais');
+    await pg.click('#folha button:has-text("Remover GIF")');
     await pg.waitForTimeout(300);
-    ok(await pg.locator('#anim-ex.gif').count() === 0 && await pg.locator('#bt-gif-remover').count() === 0, 'remove o GIF');
+    await pg.click('#bt-mais');
+    ok(await pg.locator('#anim-ex.gif').count() === 0 && await pg.locator('#folha button', { hasText: 'Remover GIF' }).count() === 0, 'remove o GIF');
     ok(!pg.erros.length, 'sem erros de página (GIF) ' + pg.erros.join(' | '));
   }
 

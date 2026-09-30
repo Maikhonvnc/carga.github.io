@@ -36,7 +36,7 @@ function adicionarExPersonalizado() {
     $('pex-nome').value = '';
   }
   aplicaCustom();
-  toast('Adicionado ➕ — aparece no grupo do exercício');
+  toast('Adicionado: aparece no grupo do exercício');
   renderPexLista();
 }
 
@@ -46,9 +46,8 @@ function renderPexLista() {
     const mov = e.mov && movMap[e.mov];
     const titulo = e.mov ? `${mov ? mov.nome : '?'} · ${e.vnome}` : e.nome;
     const det = e.mov ? 'variação' : `${esc(nomeGrupo(e.cat || 'Personalizados'))} · ${Object.keys(e.musculos).map(m => muscMap[m] ? muscMap[m].nome : m).join(' + ')}`;
-    return `<div class="musculo"><div class="cab"><span class="nome">${esc(titulo)}</span>
-      <button class="x-rot" data-pex="${e.id}" aria-label="Excluir">✕</button></div>
-      <div class="rodape">${det}</div></div>`;
+    return `<div class="pex-it"><span class="ll-txt"><span class="ll-nome">${esc(titulo)}</span><span class="ll-det">${det}</span></span>
+      <button class="btn-ic" data-pex="${e.id}" aria-label="Excluir ${esc(titulo)}">${ic('trash', 'ic-18')}</button></div>`;
   }).join('');
   el.querySelectorAll('[data-pex]').forEach(b => b.onclick = () => {
     if (!confirm('Excluir? Registros antigos continuam no histórico.')) return;
@@ -93,7 +92,7 @@ async function importar(input) {
     ativo = { ...ATIVO_PADRAO };
     salvarLogs(); salvarPerfil(); salvarPrefs(); salvarRotinas(); salvarOverrides(); salvarNotas(); salvaAtivo();
     aplicaCustom();
-    toast('Backup restaurado ✔');
+    toast('Backup restaurado');
     mostrarTab('treino');
   } catch {
     toast('Arquivo de backup inválido.');
