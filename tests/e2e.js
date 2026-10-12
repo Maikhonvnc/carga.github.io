@@ -218,13 +218,13 @@ async function novaPagina(browser, base, dados) {
     ok(await pg.evaluate(() => [0, 1, 2, 3, 4, 5, 6].every(d => dieta.plano[d].almoco.op === 2)), 'cardápio copia o dia para a semana');
     await pg.click('[data-nt="carrinho"]');
     const sem = await pg.evaluate(() => Object.fromEntries(listaCompras().map(l => [l.a, l.falta])));
-    // macarrão: 180 g cozido × 7 almoços × 0,44 = 554 g cru → 560; o jantar padrão é Rap10, então arroz não entra
-    ok(sem.macarrao === 560 && !sem.arroz && sem.ovo === 2, 'carrinho da semana converte cozido → cru e desconta o estoque');
+    // macarrão: 180 g cozido × 7 almoços × 0,44 = 554 g cru → 750 (passo de 250 g); patinho (moída no almoço + jantar) 3,07 kg → 3,5 kg; ovos 14 − 12 → 1 dúzia
+    ok(sem.macarrao === 750 && sem.patinho === 3500 && !sem.arroz && sem.ovo === 12, 'carrinho da semana converte cozido → cru e desconta o estoque');
     await pg.click('[data-per="mes"]');
     const mes = await pg.evaluate(() => Object.fromEntries(listaCompras().map(l => [l.a, l.falta])));
     ok(mes.rap10 === 60 && (await pg.textContent('#nut-corpo')).includes('60 un · 6 pacotes'), 'carrinho do mês: 30 dias, com pacotes');
     await pg.click('[data-comprei="whey"]');
-    ok(await pg.evaluate(() => dieta.estoque.whey) === 1800, 'comprei soma no estoque');
+    ok(await pg.evaluate(() => dieta.estoque.whey) === 2000, 'comprei soma no estoque');
     ok(!pg.erros.length, 'sem erros de página (nutrição) ' + pg.erros.join(' | '));
   }
 

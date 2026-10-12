@@ -63,7 +63,12 @@ function fmtCompra(a, v, semPac) {
   }
   return v >= 1000 ? `${num(Math.round(v / 100) / 10)} kg` : `${Math.round(v)} g`;
 }
-const arred = (a, v) => ALIMENTOS[a].un === 'un' ? Math.ceil(v - 1e-9) : Math.ceil(v / 10 - 1e-9) * 10;
+// compra sempre arredonda para cima: pacote fechado (dúzia, pacote) ou peso redondo (50 g, 250 g, 500 g)
+function arred(a, v) {
+  if (v <= 1e-9) return 0;
+  const al = ALIMENTOS[a], passo = al.un === 'un' ? (al.pac ? al.pac[0] : 1) : v <= 250 ? 50 : v <= 1000 ? 250 : 500;
+  return Math.ceil(v / passo - 1e-9) * passo;
+}
 
 // soma do cardápio nos próximos `dias` dias (a partir de hoje, sem o que já foi comido hoje), em unidade de compra
 function necessidade(dias) {
@@ -287,7 +292,7 @@ function renderCarrinho(el) {
       <button role="tab" data-per="semana" class="${dieta.periodo !== 'mes' ? 'ativo' : ''}" aria-selected="${dieta.periodo !== 'mes'}">Semana</button>
       <button role="tab" data-per="mes" class="${dieta.periodo === 'mes' ? 'ativo' : ''}" aria-selected="${dieta.periodo === 'mes'}">Mês (30 dias)</button>
     </div>
-    <p class="mudo">Do cardápio de hoje até ${ate}, já em peso cru, menos o que você tem no estoque. Toque em ${ic('check-circle', 'ic-16')} quando comprar: entra no estoque.</p>
+    <p class="mudo">Do cardápio de hoje até ${ate}, já em peso cru, menos o que você tem no estoque, arredondado para cima. Toque em ${ic('check-circle', 'ic-16')} quando comprar: entra no estoque.</p>
     ${comprar.length ? SECOES_NUT.map(s => {
       const ls = comprar.filter(l => ALIMENTOS[l.a].sec === s);
       return ls.length ? `<div class="secao"><div class="kicker">${s}</div><div class="lista">${ls.map(linha).join('')}</div></div>` : '';
