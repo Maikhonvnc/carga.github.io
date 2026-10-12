@@ -80,7 +80,10 @@ function abrirFolha(titulo, itens) {
   const primeiro = f.querySelector('button');
   if (primeiro) primeiro.focus();
 }
-function fecharFolha() { $('folha').hidden = true; $('folha').innerHTML = ''; }
+function fecharFolha() {
+  if (typeof pararCamera === 'function') { pararCamera(); pararCamera = null; } // scanner da nutrição
+  $('folha').hidden = true; $('folha').innerHTML = '';
+}
 
 // repetições de uma série; unilateral mostra os dois lados ("E 10 / D 9")
 const repsTxt = (s, seg) => (s.repsE != null ? `E ${s.repsE} / D ${s.repsD}` : String(s.reps)) + (seg ? ' s' : '');
