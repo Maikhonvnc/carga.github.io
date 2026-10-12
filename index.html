@@ -540,6 +540,41 @@ body.com-barra #toast{bottom:calc(var(--nav-h) + 76px + env(safe-area-inset-bott
 body.com-dock #toast{bottom:calc(var(--nav-h) + var(--dock-h) + 16px + env(safe-area-inset-bottom))}
 body.tela-cheia #toast{bottom:calc(180px + env(safe-area-inset-bottom))}
 #toast.mostrar{opacity:1}
+
+/* ---------- nutrição ---------- */
+.tiles.t4{grid-template-columns:repeat(4,1fr)}
+.tiles.t4 .tile{padding:10px 10px}
+.tiles.t4 .valor{font-size:var(--f-titulo-2)}
+.tiles.t4 .valor small{font-size:var(--f-apoio)}
+.nut-ref,.nut-agua{display:flex;flex-direction:column;gap:10px}
+.nut-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--e-2)}
+.nut-cab h3{margin:2px 0 0}
+.nut-ref.feito h3{color:var(--t-2)}
+.nut-op{justify-content:space-between;width:100%;min-height:var(--toque-min);background:var(--c-elev);color:var(--t-1);font-weight:500;text-align:left}
+.nut-op:active{background:var(--c-elev2)}
+.nut-op > span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nut-op .ic{color:var(--t-3)}
+.nut-esc .ic{color:var(--t-3);margin-left:-2px}
+.nut-itens,.nut-fatores,.nut-medidas{display:flex;flex-direction:column}
+label.nut-it,.nut-est{display:flex;align-items:center;gap:var(--e-2);margin:0;padding:4px 0;font-size:var(--f-corpo);color:var(--t-1);border-top:1px solid var(--c-divisor);min-height:52px}
+.nut-it .nome{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.nut-it .nome small{font-size:var(--f-legenda);color:var(--t-3)}
+.nut-it input,.nut-est input{flex:0 0 76px;width:76px;min-height:40px;padding:6px 8px;text-align:right}
+.nut-it .u,.nut-est .u{flex:0 0 34px;font-size:var(--f-apoio);color:var(--t-3)}
+.nut-it .k{flex:0 0 40px;text-align:right;font-size:var(--f-apoio);color:var(--t-2)}
+.nut-medidas > :first-child{border-top:0;padding-top:0}
+.nut-est{border-top:0;padding:4px var(--e-3) 4px var(--e-4)}
+.nut-macro,.nut-resumo{font-size:var(--f-apoio);color:var(--t-2);font-variant-numeric:tabular-nums}
+.nut-resumo i{color:var(--t-3)}
+.nut-acoes{display:flex;gap:var(--e-2);align-items:center}
+.nut-acoes > button:first-child{flex:1}
+.nut-ref .btn-texto.neutro{align-self:flex-start;margin:-6px -8px -10px}
+.nut-agua h3{display:flex;align-items:center;gap:6px;margin:0}
+.nut-agua h3 .ic{color:var(--acao-texto)}
+.nut-agua-bts button:first-child{flex:0 0 var(--toque)}
+.nut-falta{font-size:var(--f-corpo);white-space:nowrap}
+#tab-nutricao .seg{background:var(--c-card)}
+#tab-nutricao .seg button{padding:0 4px;min-width:0}
 </style>
 </head>
 <body>
@@ -575,6 +610,14 @@ body.tela-cheia #toast{bottom:calc(180px + env(safe-area-inset-bottom))}
   <div class="chips rolar" role="radiogroup" aria-label="Grupo" id="prog-grupos"></div>
   <div class="tiles" id="tiles-gerais"></div>
   <div class="tela justa" id="prog-evo"></div>
+  <div class="secao" id="prog-corpo"></div>
+</section>
+
+<!-- NUTRIÇÃO -->
+<section id="tab-nutricao" class="tela justa" hidden>
+  <h1>Nutrição</h1>
+  <div class="seg" role="tablist" aria-label="Nutrição" id="nut-telas"></div>
+  <div class="tela justa" id="nut-corpo"></div>
 </section>
 
 <!-- MÁQUINAS -->
@@ -669,7 +712,7 @@ body.tela-cheia #toast{bottom:calc(180px + env(safe-area-inset-bottom))}
   </div>
   <div class="card">
     <h3><svg class="ic" aria-hidden="true"><use href="icones.svg#clock-counter-clockwise"/></svg>Backup</h3>
-    <p class="mudo" style="margin-bottom:12px">Exporta treinos, anotações e perfil em JSON (fotos ficam só no aparelho).</p>
+    <p class="mudo" style="margin-bottom:12px">Exporta treinos, dieta, anotações e perfil em JSON (fotos ficam só no aparelho).</p>
     <div class="linha">
       <button id="bt-exportar">Exportar</button>
       <label class="btn ghost" style="margin:0">Importar
@@ -698,6 +741,7 @@ body.tela-cheia #toast{bottom:calc(180px + env(safe-area-inset-bottom))}
   <button data-tab="treino" data-ic="barbell" class="ativo"><span class="ic-pill"><svg class="ic" aria-hidden="true"><use href="icones.svg#barbell-fill"/></svg></span>Treino</button>
   <button data-tab="musculos" data-ic="person-arms-spread"><span class="ic-pill"><svg class="ic" aria-hidden="true"><use href="icones.svg#person-arms-spread"/></svg></span>Músculos</button>
   <button data-tab="progresso" data-ic="chart-line-up"><span class="ic-pill"><svg class="ic" aria-hidden="true"><use href="icones.svg#chart-line-up"/></svg></span>Progresso</button>
+  <button data-tab="nutricao" data-ic="fork-knife"><span class="ic-pill"><svg class="ic" aria-hidden="true"><use href="icones.svg#fork-knife"/></svg></span>Nutrição</button>
   <button data-tab="maquinas" data-ic="camera"><span class="ic-pill"><svg class="ic" aria-hidden="true"><use href="icones.svg#camera"/></svg></span>Máquinas</button>
   <button data-tab="ajustes" data-ic="gear-six"><span class="ic-pill"><svg class="ic" aria-hidden="true"><use href="icones.svg#gear-six"/></svg></span>Ajustes</button>
 </nav>
@@ -712,6 +756,7 @@ body.tela-cheia #toast{bottom:calc(180px + env(safe-area-inset-bottom))}
 <div id="lightbox"><img alt="Foto ampliada"></div>
 
 <script src="data.js"></script>
+<script src="dieta.js"></script>
 <script src="js/base.js"></script>
 <script src="js/sugestao.js"></script>
 <script src="js/treino.js"></script>
@@ -722,6 +767,7 @@ body.tela-cheia #toast{bottom:calc(180px + env(safe-area-inset-bottom))}
 <script src="js/corpo.js"></script>
 <script src="js/evolucao.js"></script>
 <script src="js/maquinas.js"></script>
+<script src="js/nutricao.js"></script>
 <script src="js/ajustes.js"></script>
 <script src="js/main.js"></script>
 <script>

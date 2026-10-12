@@ -156,6 +156,7 @@ function renderProgresso() {
   $('prog-grupos').innerHTML = grupos.map(g => `<button class="chip" role="radio" aria-checked="${g === progGrupo}" data-pg="${esc(g)}">${esc(nomeGrupo(g))}</button>`).join('');
   $('prog-grupos').querySelectorAll('[data-pg]').forEach(b => b.onclick = () => { progGrupo = b.dataset.pg; evoAberto = null; renderProgresso(); });
   renderEvolucao($('prog-evo'), progGrupo);
+  renderCorpo();
 }
 
 const tile = (valor, rotulo) => `<div class="tile"><div class="valor">${valor}</div><div class="rotulo">${rotulo}</div></div>`;

@@ -2,7 +2,7 @@
 'use strict';
 
 // ---------- navegação ----------
-const TABS = { treino: renderTreino, musculos: renderMusculos, progresso: renderProgresso, maquinas: renderMaquinas, ajustes: renderAjustes };
+const TABS = { treino: renderTreino, musculos: renderMusculos, progresso: renderProgresso, nutricao: renderNutricao, maquinas: renderMaquinas, ajustes: renderAjustes };
 let tabAtual = 'treino';
 function mostrarTab(nome) {
   tabAtual = nome;

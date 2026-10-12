@@ -65,7 +65,7 @@ function atualizaFatorTxt() {
 }
 
 function exportar() {
-  const blob = new Blob([JSON.stringify({ versao: 3, perfil, prefs, logs, rotinas, overrides, exercicios: customExs, notas })], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify({ versao: 3, perfil, prefs, logs, rotinas, overrides, exercicios: customExs, notas, dieta })], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `carga-backup-${hojeKey()}.json`;
@@ -89,6 +89,7 @@ async function importar(input) {
     overrides = d.overrides || {};
     customExs = d.exercicios || [];
     notas = d.notas || {};
+    if (d.dieta) { dieta = Object.assign(DIETA_PADRAO(), d.dieta); salvarDieta(); }
     ativo = { ...ATIVO_PADRAO };
     salvarLogs(); salvarPerfil(); salvarPrefs(); salvarRotinas(); salvarOverrides(); salvarNotas(); salvaAtivo();
     aplicaCustom();
@@ -100,7 +101,7 @@ async function importar(input) {
 }
 
 async function apagarTudo() {
-  if (!confirm('Apagar TODOS os treinos, perfil e fotos? Não tem volta.')) return;
+  if (!confirm('Apagar TODOS os treinos, dieta, perfil e fotos? Não tem volta.')) return;
   if (!confirm('Certeza mesmo?')) return;
   logs = [];
   perfil = Object.assign({}, PERFIL_PADRAO);
@@ -109,9 +110,10 @@ async function apagarTudo() {
   overrides = {};
   customExs = [];
   notas = {};
+  dieta = DIETA_PADRAO();
   ativo = { ...ATIVO_PADRAO };
   cacheMelhor = null;
-  [LS_LOGS, LS_PERFIL, LS_ROTINAS, LS_OVER, LS_CUSTOM, LS_TIMER, LS_NOTAS, LS_PREFS, LS_ATIVO].forEach(k => localStorage.removeItem(k));
+  [LS_LOGS, LS_PERFIL, LS_ROTINAS, LS_OVER, LS_CUSTOM, LS_TIMER, LS_NOTAS, LS_PREFS, LS_ATIVO, LS_DIETA].forEach(k => localStorage.removeItem(k));
   aplicaCustom();
   await idbReq((await txFotos('readwrite')).clear());
   toast('Dados apagados.');
