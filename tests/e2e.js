@@ -199,7 +199,7 @@ async function novaPagina(browser, base, dados) {
   {
     const pg = await novaPagina(browser, base, { 'carga.dieta': { estoque: { ovo: 12, arroz: 100 } } });
     await pg.click('[data-tab="nutricao"]');
-    ok(await pg.locator('.nut-ref').count() === 6, 'Hoje mostra as 6 refeições do plano');
+    ok(await pg.locator('.nut-ref:not([data-ref="extra"])').count() === 6 && await pg.locator('[data-ref="extra"]').count() === 1, 'Hoje mostra as 6 refeições do plano e o fora do plano');
     await pg.fill('[data-ref="cafe"] input[data-i="1"]', '3');
     await pg.dispatchEvent('[data-ref="cafe"] input[data-i="1"]', 'input');
     await pg.click('[data-ref="cafe"] [data-comi]');
@@ -226,6 +226,58 @@ async function novaPagina(browser, base, dados) {
     await pg.click('[data-comprei="whey"]');
     ok(await pg.evaluate(() => dieta.estoque.whey) === 2000, 'comprei soma no estoque');
     ok(!pg.erros.length, 'sem erros de página (nutrição) ' + pg.erros.join(' | '));
+  }
+
+  // 9) comida flexível: trocar/remover/adicionar, alimento por código de barras, só calorias, repetir ontem, aderência e leitura do rótulo
+  {
+    const ontem = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+    const pg = await novaPagina(browser, base, { 'carga.dieta': { diario: { [ontem]: { refs: { colacao: { ts: agora - D, itens: [{ a: 'whey', q: 40 }], fiel: false } }, troca: {}, agua: 0 } } } });
+    await pg.route('https://world.openfoodfacts.org/**', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ status: 1, product: {
+      product_name: 'Iogurte natural', brands: 'Marca', serving_quantity: 170, nutriments: { 'energy-kcal_100g': 63, proteins_100g: 3.8, carbohydrates_100g: 5, fat_100g: 3 } } }) }));
+    await pg.click('[data-tab="nutricao"]');
+    // café: tira o mamão e troca o pão francês por pão de forma (busca)
+    await pg.click('[data-ref="cafe"] [data-rm="2"]');
+    await pg.click('[data-ref="cafe"] [data-troca="0"]');
+    await pg.fill('#nut-busca', 'pao de forma');
+    await pg.click('#nut-resultados [data-a="pao_forma"]');
+    await pg.click('[data-ref="cafe"] [data-comi]');
+    const cafe = await pg.evaluate(() => dieta.diario[hojeKey()].refs.cafe);
+    ok(cafe.itens.map(i => i.a).join() === 'pao_forma,ovo,cafe' && cafe.fiel === false, 'troca e remove itens antes de registrar (fora do plano)');
+    // colação igual ao plano conta como seguida; repetir ontem copia o que foi comido
+    await pg.click('[data-ref="colacao"] [data-comi]');
+    ok((await pg.textContent('#nut-aderencia')).includes('1 de 2 refeições'), 'mostra a aderência do dia');
+    await pg.click('[data-ref="colacao"] [data-desfazer]');
+    await pg.click('[data-ref="colacao"] [data-ontem]');
+    ok(await pg.inputValue('[data-ref="colacao"] input[data-i="0"]') === '40', 'repetir ontem traz o que foi comido ontem');
+    // fora do plano: só calorias e produto pelo código de barras (Open Food Facts)
+    await pg.click('[data-ref="extra"] [data-add]');
+    await pg.click('#nb-kcal');
+    await pg.fill('#nk-nome', 'Coxinha');
+    await pg.fill('#nk-kcal', '300');
+    await pg.click('#nk-ok');
+    await pg.click('[data-ref="extra"] [data-add]');
+    await pg.click('#nb-codigo');
+    await pg.fill('#nc-num', '7891234567895');
+    await pg.click('#nc-ok');
+    await pg.waitForSelector('#na-kcal');
+    ok(await pg.inputValue('#na-kcal') === '63' && (await pg.inputValue('#na-nome')).includes('Iogurte') && await pg.inputValue('#na-porcao') === '170', 'código de barras preenche o alimento pelo Open Food Facts');
+    await pg.click('#na-ok');
+    const extra = await pg.evaluate(() => dieta.diario[hojeKey()].refs.extra.itens);
+    ok(extra.length === 2 && extra[0].k[0] === 300 && extra[1].q === 170, 'fora do plano soma calorias rápidas e o produto na porção do rótulo');
+    await pg.click('[data-ref="extra"] [data-add]');
+    await pg.click('#nb-codigo');
+    await pg.fill('#nc-num', '7891234567895');
+    await pg.click('#nc-ok');
+    ok(await pg.evaluate(() => dieta.diario[hojeKey()].refs.extra.itens.length) === 3 && await pg.isHidden('#folha'), 'mesmo código já é reconhecido sem buscar de novo');
+    ok(await pg.evaluate(() => dieta.recentes[0].startsWith('c')), 'alimento novo vai para os recentes');
+    // leitura da tabela nutricional (texto como o OCR devolve, com vírgulas perdidas)
+    const r = await pg.evaluate(() => [
+      lerRotulo('INFORMAÇÃO NUTRICIONAL\nPorção: 30 g (2 colheres de sopa)\n100g 30g %vVD*\nValor energético (kcal) 394 18 6\nCarboidratos totais (g) 66 20 7\nProteínas (g) uU 42 8\nGorduras totais (g) 85 26 4\nGorduras saturadas (g) 15 05 2'),
+      lerRotulo('Quantidade por porção de 25 g\nValor energético 100 kcal = 420 kJ 5%\nCarboidratos 15 g 5%\nProteínas 2,5 g 3%\nGorduras totais 3,5 g 6%\nGorduras saturadas 1 g'),
+    ]);
+    ok(r[0].kcal === 394 && r[0].c === 66 && r[0].p === 14 && r[0].g === 8.5 && r[0].porcao === 30, 'lê a tabela nova (100 g | porção) mesmo sem vírgulas');
+    ok(r[1].kcal === 400 && r[1].c === 60 && r[1].p === 10 && r[1].g === 14, 'lê a tabela antiga (só porção) e converte para 100 g');
+    ok(!pg.erros.length, 'sem erros de página (comida flexível) ' + pg.erros.join(' | '));
   }
 
   await browser.close();

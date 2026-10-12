@@ -556,7 +556,7 @@ body.tela-cheia #toast{bottom:calc(180px + env(safe-area-inset-bottom))}
 .nut-op .ic{color:var(--t-3)}
 .nut-esc .ic{color:var(--t-3);margin-left:-2px}
 .nut-itens,.nut-fatores,.nut-medidas{display:flex;flex-direction:column}
-label.nut-it,.nut-est{display:flex;align-items:center;gap:var(--e-2);margin:0;padding:4px 0;font-size:var(--f-corpo);color:var(--t-1);border-top:1px solid var(--c-divisor);min-height:52px}
+.nut-it,.nut-est{display:flex;align-items:center;gap:var(--e-2);margin:0;padding:4px 0;font-size:var(--f-corpo);color:var(--t-1);border-top:1px solid var(--c-divisor);min-height:52px}
 .nut-it .nome{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
 .nut-it .nome small{font-size:var(--f-legenda);color:var(--t-3)}
 .nut-it input,.nut-est input{flex:0 0 76px;width:76px;min-height:40px;padding:6px 8px;text-align:right}
@@ -574,6 +574,27 @@ label.nut-it,.nut-est{display:flex;align-items:center;gap:var(--e-2);margin:0;pa
 .nut-agua-bts button:first-child{flex:0 0 var(--toque)}
 .nut-falta{font-size:var(--f-corpo);white-space:nowrap}
 #tab-nutricao .seg{background:var(--c-card)}
+.nut-troca{flex:1;min-width:0;justify-content:center;align-items:flex-start;flex-direction:column;gap:0;min-height:44px;padding:0;background:none;color:var(--t-1);font-weight:400;text-align:left;line-height:1.25;border-radius:0}
+.nut-troca:active{background:none;color:var(--acao-texto)}
+.nut-troca small{font-size:var(--f-legenda);color:var(--t-3)}
+.nut-rm{flex:0 0 36px;width:36px;min-height:40px;margin-right:-8px;color:var(--t-3)}
+.nut-it .nut-q-fixo{flex:0 0 118px}
+.nut-mais{display:flex;flex-wrap:wrap;gap:var(--e-2);margin:-4px -8px 0}
+.nut-painel{max-height:88vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:8px 16px calc(16px + env(safe-area-inset-bottom)) !important}
+.nut-painel .folha-titulo{padding:12px 0 0 !important}
+.nut-painel label{margin:var(--e-2) 0 4px}
+.nut-fontes{display:grid;grid-template-columns:1fr 1fr;gap:var(--e-2)}
+.nut-fontes button{min-height:var(--toque-min);font-size:14px;padding:0 10px}
+.nut-resultados{display:flex;flex-direction:column}
+.nut-resultados .kicker{padding:6px 0}
+.nut-resultados .ll-linha{display:flex;justify-content:space-between;gap:var(--e-3);min-height:52px;padding:6px 0;background:none;color:var(--t-1);font-weight:400;text-align:left;border-radius:0;border-top:1px solid var(--c-divisor)}
+.nut-resultados .ll-linha > span:first-child{flex:1;min-width:0}
+#folha .nut-resultados .ll-linha{border-radius:0}
+.nut-resultados .ll-linha .valor{font-size:var(--f-apoio);color:var(--t-3);white-space:nowrap}
+.nut-camera{position:relative;border-radius:var(--r-ctl);overflow:hidden;background:#000;aspect-ratio:4/3}
+.nut-camera video{width:100%;height:100%;object-fit:cover;display:block}
+.nut-mira{position:absolute;left:12%;right:12%;top:38%;bottom:38%;border:2px solid var(--acao);border-radius:8px}
+.nut-aviso{padding:10px 12px}
 #tab-nutricao .seg button{padding:0 4px;min-width:0}
 </style>
 </head>
@@ -768,6 +789,7 @@ label.nut-it,.nut-est{display:flex;align-items:center;gap:var(--e-2);margin:0;pa
 <script src="js/evolucao.js"></script>
 <script src="js/maquinas.js"></script>
 <script src="js/nutricao.js"></script>
+<script src="js/nutricao-busca.js"></script>
 <script src="js/ajustes.js"></script>
 <script src="js/main.js"></script>
 <script>

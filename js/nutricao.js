@@ -5,8 +5,10 @@
 const LS_DIETA = 'carga.dieta';
 // plano[diaDaSemana][refeição] = {op, esc}; diario[dia] = {refs: {ref: registro}, troca: {ref: célula}, agua};
 // estoque e fatores na unidade de compra (g cru, un)
-const DIETA_PADRAO = () => ({ plano: {}, estoque: {}, diario: {}, fatores: {}, medidas: [], periodo: 'semana' });
+const DIETA_PADRAO = () => ({ plano: {}, estoque: {}, diario: {}, fatores: {}, medidas: [], periodo: 'semana', custom: {}, recentes: [] });
 let dieta = Object.assign(DIETA_PADRAO(), lerLS(LS_DIETA, {}));
+Object.assign(ALIMENTOS, dieta.custom); // alimentos que você cadastrou (rótulo, código de barras)
+SECOES_NUT.push('Meus alimentos');
 const salvarDieta = () => localStorage.setItem(LS_DIETA, JSON.stringify(dieta));
 
 let nutTela = 'hoje', nutDia = new Date().getDay(), rasc = {}, corpoForm = false;
@@ -35,13 +37,15 @@ function itensDe(ref, cel) {
 }
 
 const gramas = (a, q) => ALIMENTOS[a].un === 'un' ? q * ALIMENTOS[a].gUn : q;
+const somaM = (a, b) => a.map((v, i) => v + (b[i] || 0));
+const nomeIt = it => it.k ? (it.nome || 'Calorias') : ALIMENTOS[it.a].nome;
 function macros(itens) { // [kcal, proteína, carbo, gordura]
-  return itens.reduce((t, { a, q }) => {
+  return itens.reduce((t, { a, q, k }) => {
+    if (k) return somaM(t, k); // só calorias
     const g = gramas(a, q) / 100;
     return t.map((v, i) => v + ALIMENTOS[a].m[i] * g);
   }, [0, 0, 0, 0]);
 }
-const somaM = (a, b) => a.map((v, i) => v + b[i]);
 const unTxt = a => ALIMENTOS[a].un === 'un' ? (ALIMENTOS[a].nu || 'un') : ALIMENTOS[a].un;
 const qtdTxt = (a, q) => `${num(q)} ${unTxt(a)}`;
 const kcal = v => Math.round(v).toLocaleString('pt-BR');
@@ -130,6 +134,25 @@ function fimDeSemanaKeys() { // sábado e domingo deste fim de semana (só em s�
   return [dayKey(sab), dayKey(sab + 864e5)];
 }
 const livresNoFds = ks => ks.reduce((n, k) => n + Object.values((dieta.diario[k] || { refs: {} }).refs).filter(r => r.livre).length, 0);
+const EXTRA = { id: 'extra', nome: 'Fora do plano', hora: 'lanches e extras' };
+const ontemKey = () => dayKey(new Date(hojeKey() + 'T12:00').getTime() - 864e5);
+
+// seguiu a dieta? mesmos alimentos do plano (sem contar os "à vontade") com até 25% de diferença no peso
+function seguiuPlano(ref, cel, itens) {
+  const plano = itensDe(ref, cel).filter(i => !i.av), comidos = itens.filter(i => !i.k && !(ALIMENTOS[i.a] && ALIMENTOS[i.a].av));
+  if (plano.length !== comidos.length) return false;
+  return plano.every(p => comidos.some(c => c.a === p.a && Math.abs(c.q - p.q) <= p.q * 0.25));
+}
+// aderência: refeições do plano registradas que seguiram a dieta (refeição livre conta como seguida)
+function aderencia(keys) {
+  let feitas = 0, fieis = 0;
+  for (const k of keys) for (const [ref, r] of Object.entries((dieta.diario[k] || { refs: {} }).refs)) {
+    if (ref === 'extra') continue;
+    feitas++;
+    if (r.livre || r.fiel) fieis++;
+  }
+  return { feitas, fieis };
+}
 
 function renderNutHoje(el) {
   const key = hojeKey(), d = dieta.diario[key] || { refs: {}, agua: 0 };
@@ -140,10 +163,13 @@ function renderNutHoje(el) {
     plano = somaM(plano, m);
     if (reg) comido = somaM(comido, m);
   }
+  if (d.refs.extra) comido = somaM(comido, macros(d.refs.extra.itens));
   const agua = d.agua || 0, fds = fimDeSemanaKeys();
+  const hojeAd = aderencia([key]), sem = aderencia(Array.from({ length: 7 }, (_, i) => dayKey(Date.now() - i * 864e5)));
   el.innerHTML = `
     <div class="topo-data"><span>${dataLonga(Date.now())}</span>${fds ? `<span class="tag tag-atencao">Refeição livre: ${livresNoFds(fds)} de 1</span>` : ''}</div>
-    <div class="secao"><div class="kicker">Comido hoje</div>${tilesMacro(comido, plano)}</div>
+    <div class="secao"><div class="kicker">Comido hoje</div>${tilesMacro(comido, plano)}
+      ${hojeAd.feitas ? `<p class="mudo" id="nut-aderencia">Seguiu a dieta em ${hojeAd.fieis} de ${plural(hojeAd.feitas, 'refeição', 'refeições')} hoje${sem.feitas > hojeAd.feitas ? ` · ${Math.round(sem.fieis / sem.feitas * 100)}% nos últimos 7 dias` : ''}.</p>` : ''}</div>
     <div class="card nut-agua">
       <div class="nut-cab"><h3>${ic('drop')}Água</h3><span class="num"><b>${num(agua / 1000)}</b> de ${num(META_AGUA / 1000)} L</span></div>
       <div class="barra"><div style="width:${Math.min(100, agua / META_AGUA * 100)}%;background:var(--acao)"></div></div>
@@ -152,41 +178,69 @@ function renderNutHoje(el) {
         <button data-agua="250">+250 ml</button><button data-agua="500">+500 ml</button>
       </div>
     </div>
-    ${REFEICOES.map(r => cardRefeicao(key, r, d.refs[r.id])).join('')}`;
+    ${REFEICOES.map(r => cardRefeicao(key, r, d.refs[r.id])).join('')}
+    ${cardExtra(d.refs.extra)}`;
   el.querySelectorAll('[data-agua]').forEach(b => b.onclick = () => {
     const dr = diaReg(key);
     dr.agua = Math.max(0, (dr.agua || 0) + +b.dataset.agua);
     salvarDieta(); renderNutHoje(el);
   });
   for (const r of REFEICOES) ligaRefeicao(el.querySelector(`[data-ref="${r.id}"]`), key, r, el);
+  ligaExtra(el.querySelector('[data-ref="extra"]'), key, el);
 }
 
+const cabRef = (r, tag) => `<div class="nut-cab"><div><div class="kicker">${esc(r.hora)}</div><h3>${esc(r.nome)}</h3></div>${tag}</div>`;
+const pillsItens = itens => `<div class="pills">${itens.map(i => `<span class="pill">${esc(nomeIt(i))} ${i.k ? `${kcal(i.k[0])} kcal` : qtdTxt(i.a, i.q)}</span>`).join('')}</div>`;
+
+// linha editável de um item (peso, trocar, remover)
+const linhaItem = (it, i) => `<div class="nut-it">
+  <button class="nome nut-troca" data-troca="${i}">${esc(nomeIt(it))}${it.k ? '<small>só calorias</small>' : it.av ? '<small>à vontade</small>' : ''}</button>
+  ${it.k ? '<span class="nut-q-fixo"></span>' : `<input type="number" inputmode="decimal" min="0" step="any" class="num" data-i="${i}" value="${it.q}" aria-label="${esc(nomeIt(it))} em ${unTxt(it.a)}">
+  <span class="u">${unTxt(it.a)}</span>`}<span class="k num" data-k="${i}">${kcal(macros([it])[0])}</span>
+  <button class="btn-ic nut-rm" data-rm="${i}" aria-label="Tirar ${esc(nomeIt(it))}">${ic('x', 'ic-18')}</button></div>`;
+
 function cardRefeicao(key, r, reg) {
-  const cab = (tag) => `<div class="nut-cab"><div><div class="kicker">${esc(r.hora)}</div><h3>${esc(r.nome)}</h3></div>${tag}</div>`;
-  if (reg && reg.livre) return `<div class="card nut-ref feito" data-ref="${r.id}">${cab(`<span class="tag tag-atencao">${ic('fire')}Refeição livre</span>`)}
+  if (reg && reg.livre) return `<div class="card nut-ref feito" data-ref="${r.id}">${cabRef(r, `<span class="tag tag-atencao">${ic('fire')}Refeição livre</span>`)}
     <button class="btn-texto neutro" data-desfazer>${ic('arrow-counter-clockwise')}Desfazer</button></div>`;
   if (reg) {
-    const m = macros(reg.itens);
-    return `<div class="card nut-ref feito" data-ref="${r.id}">${cab(`<span class="tag tag-ok">${ic('check-circle-fill')}Comido ${dataHora(reg.ts)}</span>`)}
-      <div class="mudo">${esc(r.ops[reg.op] ? r.ops[reg.op].nome : '')}</div>
-      <div class="pills">${reg.itens.map(i => `<span class="pill">${esc(ALIMENTOS[i.a].nome)} ${qtdTxt(i.a, i.q)}</span>`).join('')}</div>
-      <div class="nut-macro">${macroLinha(m)}</div>
+    return `<div class="card nut-ref feito" data-ref="${r.id}">${cabRef(r, `<span class="tag ${reg.fiel ? 'tag-ok' : ''}">${ic(reg.fiel ? 'check-circle-fill' : 'check')}Comido ${dataHora(reg.ts)}</span>`)}
+      <div class="mudo">${reg.fiel ? esc(r.ops[reg.op] ? r.ops[reg.op].nome : '') : 'Diferente do plano'}</div>
+      ${pillsItens(reg.itens)}
+      <div class="nut-macro">${macroLinha(macros(reg.itens))}</div>
       <button class="btn-texto neutro" data-desfazer>${ic('arrow-counter-clockwise')}Desfazer</button></div>`;
   }
-  const cel = celDoDia(key, r.id), itens = itensDe(r.id, cel), qs = rasc[r.id] || {};
-  const reais = itens.map((it, i) => ({ ...it, q: qs[i] ?? it.q }));
-  return `<div class="card nut-ref" data-ref="${r.id}">${cab(`<span class="tag num" data-kcal>${kcal(macros(reais)[0])} kcal</span>`)}
+  const cel = celDoDia(key, r.id), itens = rascunho(key, r.id), ontem = (dieta.diario[ontemKey()] || { refs: {} }).refs[r.id];
+  return `<div class="card nut-ref" data-ref="${r.id}">${cabRef(r, `<span class="tag num" data-kcal>${kcal(macros(itens)[0])} kcal</span>`)}
     ${r.ops.length > 1 ? `<button class="nut-op" data-trocar><span>${cel.op + 1}. ${esc(r.ops[cel.op].nome)}</span>${ic('caret-down', 'ic-18')}</button>` : `<div class="mudo">${esc(r.ops[0].nome)}</div>`}
-    ${chipsEscolha(r.id, cel)}
-    <div class="nut-itens">${reais.map((it, i) => `<label class="nut-it">
-      <span class="nome">${esc(ALIMENTOS[it.a].nome)}${it.av ? '<small>à vontade</small>' : ''}</span>
-      <input type="number" inputmode="decimal" min="0" step="any" class="num" data-i="${i}" value="${it.q}" aria-label="${esc(ALIMENTOS[it.a].nome)} em ${unTxt(it.a)}">
-      <span class="u">${unTxt(it.a)}</span><span class="k num" data-k="${i}">${kcal(macros([it])[0])}</span></label>`).join('')}</div>
-    <div class="nut-macro" data-macro>${macroLinha(macros(reais))}</div>
+    ${rasc[r.id] ? '' : chipsEscolha(r.id, cel)}
+    <div class="nut-itens">${itens.map(linhaItem).join('')}</div>
+    <div class="nut-mais"><button class="btn-texto" data-add>${ic('plus', 'ic-18')}Adicionar</button>
+      ${ontem && ontem.itens ? `<button class="btn-texto neutro" data-ontem>${ic('arrow-counter-clockwise', 'ic-18')}Repetir ontem</button>` : ''}
+      ${rasc[r.id] ? `<button class="btn-texto neutro" data-plano>Voltar ao plano</button>` : ''}</div>
+    <div class="nut-macro" data-macro>${macroLinha(macros(itens))}</div>
     <div class="nut-acoes"><button data-comi>${ic('check')}Comi</button><button class="btn-texto neutro" data-livre>Refeição livre</button></div>
   </div>`;
 }
 const dataHora = ts => { const d = new Date(ts); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+
+// o que vai ser registrado: o plano do dia, ou a versão que você editou (rasc)
+const rascunho = (key, ref) => rasc[ref] || itensDe(ref, celDoDia(key, ref));
+const copiaItens = itens => itens.map(i => ({ ...i, k: i.k && i.k.slice() }));
+
+// liga peso, trocar, remover e adicionar de uma lista de itens; mudou(itens) grava e redesenha
+function ligaItens(card, pegar, mudou, aoDigitar) {
+  card.querySelectorAll('input[data-i]').forEach(inp => inp.oninput = () => {
+    const v = parseFloat(inp.value.replace(',', '.')), its = pegar();
+    its[inp.dataset.i].q = isFinite(v) && v >= 0 ? v : 0;
+    aoDigitar(its, +inp.dataset.i);
+  });
+  card.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { const its = pegar(); its.splice(+b.dataset.rm, 1); mudou(its); });
+  card.querySelectorAll('[data-troca]').forEach(b => b.onclick = () => {
+    const i = +b.dataset.troca, its = pegar();
+    abrirBusca(`Trocar ${nomeIt(its[i])} por…`, novo => { its[i] = novo; mudou(its); });
+  });
+  card.querySelector('[data-add]').onclick = () => abrirBusca('Adicionar', novo => { const its = pegar(); its.push(novo); mudou(its); });
+}
 
 function ligaRefeicao(card, key, r, el) {
   const d = dieta.diario[key], reg = d && d.refs[r.id];
@@ -198,28 +252,26 @@ function ligaRefeicao(card, key, r, el) {
     };
     return;
   }
-  const cel = celDoDia(key, r.id), itens = itensDe(r.id, cel);
+  const cel = celDoDia(key, r.id);
   const trocar = nova => { diaReg(key).troca[r.id] = nova; delete rasc[r.id]; salvarDieta(); renderNutHoje(el); };
   const bt = card.querySelector('[data-trocar]');
   if (bt) bt.onclick = () => folhaOpcoes(r.id, cel, trocar);
   ligaEscolhas(card, r.id, cel, trocar);
-  const atuais = () => itens.map((it, i) => ({ ...it, q: (rasc[r.id] || {})[i] ?? it.q }));
-  card.querySelectorAll('input[data-i]').forEach(inp => inp.oninput = () => {
-    const v = parseFloat(inp.value.replace(',', '.'));
-    (rasc[r.id] = rasc[r.id] || {})[inp.dataset.i] = isFinite(v) && v >= 0 ? v : 0;
-    const its = atuais();
-    card.querySelector(`[data-k="${inp.dataset.i}"]`).textContent = kcal(macros([its[inp.dataset.i]])[0]);
+  // o primeiro toque em qualquer item vira rascunho; a partir daí a refeição é "a sua versão"
+  const pegar = () => rasc[r.id] || (rasc[r.id] = copiaItens(itensDe(r.id, cel)));
+  ligaItens(card, pegar, its => { rasc[r.id] = its; renderNutHoje(el); }, (its, i) => {
+    card.querySelector(`[data-k="${i}"]`).textContent = kcal(macros([its[i]])[0]);
     card.querySelector('[data-kcal]').textContent = `${kcal(macros(its)[0])} kcal`;
     card.querySelector('[data-macro]').textContent = macroLinha(macros(its));
   });
+  const bo = card.querySelector('[data-ontem]');
+  if (bo) bo.onclick = () => { rasc[r.id] = copiaItens(dieta.diario[ontemKey()].refs[r.id].itens); renderNutHoje(el); };
+  const bp = card.querySelector('[data-plano]');
+  if (bp) bp.onclick = () => { delete rasc[r.id]; renderNutHoje(el); };
   card.querySelector('[data-comi]').onclick = () => {
-    const comidos = atuais().filter(i => i.q > 0).map(({ a, q }) => ({ a, q }));
-    const baixa = {};
-    for (const { a, q } of comidos) {
-      const tem = dieta.estoque[a] || 0, sai = Math.min(tem, compra(a, q));
-      if (sai > 0) { dieta.estoque[a] = tem - sai; baixa[a] = (baixa[a] || 0) + sai; }
-    }
-    diaReg(key).refs[r.id] = { ts: Date.now(), op: cel.op, itens: comidos, baixa };
+    const comidos = rascunho(key, r.id).filter(i => i.k || i.q > 0).map(({ a, q, k, nome }) => k ? { a, q, k, nome } : { a, q });
+    diaReg(key).refs[r.id] = { ts: Date.now(), op: cel.op, itens: comidos, baixa: baixaEstoque(comidos), fiel: seguiuPlano(r.id, cel, comidos) };
+    lembraRecentes(comidos);
     delete rasc[r.id];
     salvarDieta(); renderNutHoje(el);
     toast(`${r.nome}: ${kcal(macros(comidos)[0])} kcal`);
@@ -231,6 +283,40 @@ function ligaRefeicao(card, key, r, el) {
     diaReg(key).refs[r.id] = { ts: Date.now(), livre: true };
     salvarDieta(); renderNutHoje(el);
   };
+}
+
+// tira do estoque o que foi comido; devolve quanto saiu de cada um (para o "desfazer")
+function baixaEstoque(itens, baixa = {}) {
+  for (const { a, q, k } of itens) {
+    if (k || !ALIMENTOS[a]) continue;
+    const tem = dieta.estoque[a] || 0, sai = Math.min(tem, compra(a, q));
+    if (sai > 0) { dieta.estoque[a] = tem - sai; baixa[a] = (baixa[a] || 0) + sai; }
+  }
+  return baixa;
+}
+function lembraRecentes(itens) {
+  for (const { a, k } of itens) if (!k) dieta.recentes = [a, ...dieta.recentes.filter(x => x !== a)].slice(0, 12);
+}
+
+// fora do plano: cada item já entra no dia (sem botão "Comi")
+function cardExtra(reg) {
+  const itens = reg ? reg.itens : [];
+  return `<div class="card nut-ref" data-ref="extra">${cabRef(EXTRA, itens.length ? `<span class="tag num">${kcal(macros(itens)[0])} kcal</span>` : '')}
+    ${itens.length ? `<div class="nut-itens">${itens.map(linhaItem).join('')}</div><div class="nut-macro">${macroLinha(macros(itens))}</div>` : '<p class="mudo">Comeu algo que não está na dieta? Registre aqui, pela busca, pelo código de barras ou só as calorias.</p>'}
+    <div class="nut-mais"><button class="btn-texto" data-add>${ic('plus', 'ic-18')}Adicionar</button></div></div>`;
+}
+function ligaExtra(card, key, el) {
+  const pegar = () => { const dr = diaReg(key); return (dr.refs.extra = dr.refs.extra || { ts: Date.now(), itens: [], baixa: {} }).itens; };
+  const mudou = its => {
+    const reg = diaReg(key).refs.extra;
+    for (const [a, v] of Object.entries(reg.baixa || {})) dieta.estoque[a] = (dieta.estoque[a] || 0) + v; // refaz a baixa do zero
+    reg.itens = its; reg.baixa = baixaEstoque(its);
+    if (!its.length) delete diaReg(key).refs.extra;
+    lembraRecentes(its);
+    salvarDieta(); renderNutHoje(el);
+  };
+  let tDigitar;
+  ligaItens(card, pegar, mudou, its => { clearTimeout(tDigitar); tDigitar = setTimeout(() => mudou(its), 600); });
 }
 
 // ---------- Cardápio ----------
