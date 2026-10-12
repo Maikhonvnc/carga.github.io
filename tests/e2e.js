@@ -195,6 +195,39 @@ async function novaPagina(browser, base, dados) {
     ok(!pg.erros.length, 'sem erros de página (GIF) ' + pg.erros.join(' | '));
   }
 
+  // 8) nutrição: comer desconta do estoque, macros do dia, cardápio e carrinho semanal/mensal
+  {
+    const pg = await novaPagina(browser, base, { 'carga.dieta': { estoque: { ovo: 12, arroz: 100 } } });
+    await pg.click('[data-tab="nutricao"]');
+    ok(await pg.locator('.nut-ref').count() === 6, 'Hoje mostra as 6 refeições do plano');
+    await pg.fill('[data-ref="cafe"] input[data-i="1"]', '3');
+    await pg.dispatchEvent('[data-ref="cafe"] input[data-i="1"]', 'input');
+    await pg.click('[data-ref="cafe"] [data-comi]');
+    const reg = await pg.evaluate(() => dieta.diario[hojeKey()].refs.cafe);
+    ok(reg.itens.find(i => i.a === 'ovo').q === 3 && await pg.evaluate(() => dieta.estoque.ovo) === 9, 'Comi salva o peso digitado e tira do estoque');
+    ok((await pg.textContent('.tiles.t4 .tile')).startsWith('432'), 'calorias do dia somam o que foi comido');
+    await pg.click('[data-agua="500"]');
+    ok(await pg.evaluate(() => dieta.diario[hojeKey()].agua) === 500, 'conta a água');
+    await pg.click('[data-ref="cafe"] [data-desfazer]');
+    ok(await pg.evaluate(() => dieta.estoque.ovo) === 12 && !(await pg.evaluate(() => dieta.diario[hojeKey()].refs.cafe)), 'desfazer devolve ao estoque');
+    // cardápio: almoço opção 3 (macarrão) na semana toda
+    await pg.click('[data-nt="cardapio"]');
+    await pg.click('[data-ref="almoco"] [data-trocar]');
+    await pg.click('#folha [data-i="2"]');
+    await pg.click('#bt-repetir-dia');
+    ok(await pg.evaluate(() => [0, 1, 2, 3, 4, 5, 6].every(d => dieta.plano[d].almoco.op === 2)), 'cardápio copia o dia para a semana');
+    await pg.click('[data-nt="carrinho"]');
+    const sem = await pg.evaluate(() => Object.fromEntries(listaCompras().map(l => [l.a, l.falta])));
+    // macarrão: 180 g cozido × 7 almoços × 0,44 = 554 g cru → 560; o jantar padrão é Rap10, então arroz não entra
+    ok(sem.macarrao === 560 && !sem.arroz && sem.ovo === 2, 'carrinho da semana converte cozido → cru e desconta o estoque');
+    await pg.click('[data-per="mes"]');
+    const mes = await pg.evaluate(() => Object.fromEntries(listaCompras().map(l => [l.a, l.falta])));
+    ok(mes.rap10 === 60 && (await pg.textContent('#nut-corpo')).includes('60 un · 6 pacotes'), 'carrinho do mês: 30 dias, com pacotes');
+    await pg.click('[data-comprei="whey"]');
+    ok(await pg.evaluate(() => dieta.estoque.whey) === 1800, 'comprei soma no estoque');
+    ok(!pg.erros.length, 'sem erros de página (nutrição) ' + pg.erros.join(' | '));
+  }
+
   await browser.close();
   servidor.close();
   console.log(falhas ? `\n${falhas} falha(s)` : '\nTudo certo ✔');
