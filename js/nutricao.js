@@ -88,12 +88,12 @@ function necessidade(dias) {
 }
 
 // ---------- navegação interna ----------
-const NUT_TELAS = [['hoje', 'Hoje'], ['cardapio', 'Cardápio'], ['carrinho', 'Carrinho'], ['estoque', 'Estoque']];
+const NUT_TELAS = [['hoje', 'Hoje'], ['cardapio', 'Cardápio'], ['carrinho', 'Carrinho'], ['estoque', 'Estoque'], ['produtos', 'Produtos']];
 function renderNutricao() {
   $('nut-telas').innerHTML = NUT_TELAS.map(([id, nome]) =>
     `<button role="tab" data-nt="${id}" aria-selected="${id === nutTela}" class="${id === nutTela ? 'ativo' : ''}">${nome}</button>`).join('');
   $('nut-telas').querySelectorAll('[data-nt]').forEach(b => b.onclick = () => { nutTela = b.dataset.nt; renderNutricao(); });
-  ({ hoje: renderNutHoje, cardapio: renderCardapio, carrinho: renderCarrinho, estoque: renderEstoque })[nutTela]($('nut-corpo'));
+  ({ hoje: renderNutHoje, cardapio: renderCardapio, carrinho: renderCarrinho, estoque: renderEstoque, produtos: renderProdutos })[nutTela]($('nut-corpo'));
 }
 
 const tilesMacro = (m, meta) => `<div class="tiles t4">

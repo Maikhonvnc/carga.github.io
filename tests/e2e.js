@@ -280,6 +280,53 @@ async function novaPagina(browser, base, dados) {
     ok(!pg.erros.length, 'sem erros de página (comida flexível) ' + pg.erros.join(' | '));
   }
 
+  // 10) produtos (estilo Desrotulando): nota, processamento, alertas, comparar e alternativas
+  {
+    const prod = (code, nome, n, nova, ad, cats) => ({ code, product_name: nome, brands: 'Marca', serving_quantity: 30, nova_group: nova,
+      additives_tags: ad, ingredients_text_pt: 'farinha de trigo, açúcar…', categories_tags: cats, nutriments: n });
+    const recheado = prod('7890000000017', 'Biscoito recheado', { 'energy-kcal_100g': 480, proteins_100g: 5, carbohydrates_100g: 70, fat_100g: 20,
+      sugars_100g: 35, 'saturated-fat_100g': 9, sodium_100g: 0.3, fiber_100g: 1.5 }, 4, ['en:e322', 'en:e471', 'en:e150d'], ['en:snacks', 'en:biscuits']);
+    const integral = prod('7890000000024', 'Biscoito integral', { 'energy-kcal_100g': 420, proteins_100g: 9, carbohydrates_100g: 65, fat_100g: 12,
+      sugars_100g: 12, 'saturated-fat_100g': 3, sodium_100g: 0.35, fiber_100g: 7 }, 3, [], ['en:snacks', 'en:biscuits']);
+    const pg = await novaPagina(browser, base, {});
+    await pg.route('https://world.openfoodfacts.org/**', r => {
+      const u = r.request().url();
+      if (u.includes('/search')) return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ products: [recheado, integral] }) });
+      const p = [recheado, integral].find(x => u.includes(x.code));
+      r.fulfill({ contentType: 'application/json', body: JSON.stringify(p ? { status: 1, product: p } : { status: 0 }) });
+    });
+    await pg.click('[data-tab="nutricao"]');
+    await pg.click('[data-nt="produtos"]');
+    const escanear = async code => {
+      await pg.click('#np-escanear');
+      await pg.fill('#nc-num', code);
+      await pg.click('#nc-ok');
+      await pg.waitForSelector('#na-ok');
+    };
+    await escanear('7890000000017');
+    const resumo = await pg.textContent('.nut-resumo-prod');
+    ok(/Evite/.test(resumo) && resumo.includes('Ultraprocessado') && resumo.includes('Alto em açúcar') && resumo.includes('1 aditivo de atenção'), 'escanear mostra nota, processamento e alertas antes de salvar');
+    await pg.click('#na-ok');
+    await pg.waitForSelector('.nut-ficha');
+    const ficha = await pg.textContent('#folha');
+    ok(ficha.includes('Alto em gordura saturada') && ficha.includes('E150D · caramelo IV') && ficha.includes('Ingredientes'), 'ficha do produto com lupa, aditivos e ingredientes');
+    // alternativas: acha o integral (nota maior) e salva
+    await pg.click('#nf-alt');
+    await pg.waitForSelector('.nut-resultados [data-i]');
+    ok((await pg.textContent('.nut-resultados')).includes('Biscoito integral') && !(await pg.textContent('.nut-resultados')).includes('recheado'), 'alternativas trazem só produtos com nota maior');
+    await pg.click('.nut-resultados [data-i="0"]');
+    await pg.click('#na-ok');
+    await pg.waitForSelector('.nut-ficha');
+    ok(await pg.locator('#nut-corpo [data-prod]').count() === 2, 'alternativa salva entra nos produtos');
+    await pg.click('#nf-comparar');
+    await pg.click('#folha [data-i="0"]');
+    const comp = await pg.textContent('.nut-comp');
+    ok(comp.includes('Biscoito recheado') && comp.includes('Ultraprocessado') && await pg.locator('.nut-comp td.c-ok').count() >= 5, 'compara dois produtos lado a lado e marca o melhor');
+    const notas = await pg.evaluate(() => [notaProduto([159, 32, 0, 2.5], { nova: 1, acucar: 0, satur: 0.8, sodio: 60, fibra: 0 }).nota, notaProduto([480, 5, 70, 20], { acucar: 35 }).parcial]);
+    ok(notas[0] >= 90 && notas[1] === true, 'nota alta para frango grelhado e aviso de nota parcial sem sódio');
+    ok(!pg.erros.length, 'sem erros de página (produtos) ' + pg.erros.join(' | '));
+  }
+
   await browser.close();
   servidor.close();
   console.log(falhas ? `\n${falhas} falha(s)` : '\nTudo certo ✔');

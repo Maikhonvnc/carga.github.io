@@ -76,6 +76,7 @@ function formAlimento(pre, pronto) {
   const campo = (id, rot, v, ph = '') => `<div><label for="${id}">${rot}</label><input id="${id}" type="number" inputmode="decimal" step="any" min="0" value="${v ?? ''}" placeholder="${ph}"></div>`;
   abrirPainel(`<div class="kicker folha-titulo">Alimento novo</div>
     ${pre.aviso ? `<div class="aviso-card nut-aviso">${ic('info')}<span>${esc(pre.aviso)}</span></div>` : ''}
+    ${pre.info && pre.kcal != null ? resumoProduto([pre.kcal, pre.p || 0, pre.c || 0, pre.g || 0], pre.info) : ''}
     <label for="na-nome">Nome</label><input id="na-nome" type="text" value="${esc(pre.nome || '')}" placeholder="ex.: Iogurte natural">
     <div class="seg" id="na-base" style="margin-top:12px;background:var(--c-elev)">
       <button data-base="100" class="${base === '100' ? 'ativo' : ''}">Valores por 100 g</button>
@@ -99,6 +100,7 @@ function formAlimento(pre, pronto) {
     const id = 'c' + Date.now().toString(36);
     const al = { nome, sec: 'Meus alimentos', un: 'g', m: [r1(v('na-kcal')), r1(v('na-p')), r1(v('na-c')), r1(v('na-g'))], q0: porcao || 100 };
     if (pre.codigo) al.codigo = pre.codigo;
+    if (pre.info && b === '100') al.info = pre.info; // açúcar, sódio, aditivos… (por 100 g) para a nota do produto
     dieta.custom[id] = ALIMENTOS[id] = al;
     salvarDieta();
     pronto(id);
@@ -157,17 +159,11 @@ async function buscarCodigo(codigo, pronto) {
   if (local) { fecharPainel(); return pronto(local); }
   abrirPainel(`<div class="kicker folha-titulo">Código ${esc(codigo)}</div><p class="mudo">Procurando o produto…</p>`);
   try {
-    const r = await fetch(`${OFF_API}${codigo}.json?fields=product_name,brands,nutriments,serving_quantity`);
+    const r = await fetch(`${OFF_API}${codigo}.json?fields=${OFF_CAMPOS}`);
     const d = await r.json();
     const n = d.product && d.product.nutriments;
     if (d.status !== 1 || !n || n['energy-kcal_100g'] == null) throw new Error('sem dados');
-    const r1 = x => x == null ? '' : Math.round(x * 10) / 10;
-    formAlimento({
-      codigo, base: '100', nome: [d.product.product_name, d.product.brands && d.product.brands.split(',')[0]].filter(Boolean).join(' · '),
-      porcao: d.product.serving_quantity ? r1(+d.product.serving_quantity) : '',
-      kcal: r1(n['energy-kcal_100g']), p: r1(n.proteins_100g), c: r1(n.carbohydrates_100g), g: r1(n.fat_100g),
-      aviso: 'Achei no Open Food Facts. Confira com o rótulo antes de salvar.',
-    }, pronto);
+    formAlimento({ ...alimentoDoOFF(d.product, codigo), base: '100', aviso: 'Achei no Open Food Facts. Confira com o rótulo antes de salvar.' }, pronto);
   } catch {
     formAlimento({ codigo, aviso: 'Não achei este produto. Use "Foto da tabela" ou preencha com o rótulo; da próxima vez o código já é reconhecido.' }, pronto);
   }
@@ -258,5 +254,10 @@ function lerRotulo(texto) {
   const r = { kcal: melhor.kcal, c: melhor.c, p: melhor.p, g: melhor.g, base: '100' };
   if (porcao) r.porcao = porcao;
   if (!tem100 && !porcao) r.base = 'porcao';
+  // extras para a nota do produto (não entram na conta das calorias)
+  const um = l => l.length ? l[0] : null;
+  const info = { acucar: um(candidatos(/acucares? totais|acucares?\b/, /adicionad/, 100)), satur: um(candidatos(/gorduras? saturad/, null, 100)),
+    sodio: um(candidatos(/sodio/, null, 5000)), fibra: um(candidatos(/fibra/, null, 100)) };
+  if (Object.values(info).some(v => v != null)) r.info = info;
   return r;
 }
