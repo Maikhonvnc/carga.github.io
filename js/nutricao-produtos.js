@@ -4,7 +4,7 @@
 'use strict';
 
 const OFF_BUSCA = 'https://world.openfoodfacts.org/api/v2/search';
-const OFF_CAMPOS = 'code,product_name,brands,nutriments,serving_quantity,nova_group,additives_tags,ingredients_text_pt,ingredients_text,categories_tags';
+const OFF_CAMPOS = 'code,product_name,brands,nutriments,serving_quantity,nova_group,additives_tags,ingredients_text_pt,ingredients_text,categories_tags,product_quantity';
 const NOVA = { 1: 'In natura ou minimamente processado', 2: 'Ingrediente culinário', 3: 'Processado', 4: 'Ultraprocessado' };
 // aditivos que costumam pedir atenção (nome em português); os demais só entram na contagem
 const ADITIVOS_ATENCAO = {
@@ -21,6 +21,7 @@ function alimentoDoOFF(p, codigo) {
     codigo: codigo || p.code,
     nome: [p.product_name, p.brands && p.brands.split(',')[0]].filter(Boolean).join(' · '),
     porcao: p.serving_quantity ? r1(p.serving_quantity) : '',
+    pacote: p.product_quantity ? r1(p.product_quantity) : null, // peso da embalagem (g)
     kcal: r1(n['energy-kcal_100g']), p: r1(n.proteins_100g), c: r1(n.carbohydrates_100g), g: r1(n.fat_100g),
     info: {
       nova: p.nova_group || null,
@@ -107,7 +108,9 @@ function abrirFicha(a) {
     </div>
     ${ad.length ? `<div class="kicker">Aditivos (${ad.length})</div><div class="pills">${ad.map(x => `<span class="pill${ADITIVOS_ATENCAO[x] ? ' nut-ad-atencao' : ''}">${x.toUpperCase()}${ADITIVOS_ATENCAO[x] ? ` · ${ADITIVOS_ATENCAO[x]}` : ''}</span>`).join('')}</div>` : ''}
     ${info.ing ? `<details class="nut-ing"><summary>Ingredientes</summary><p>${esc(info.ing)}</p></details>` : ''}
-    <div class="linha"><button class="ghost" id="nf-comparar">Comparar</button><button class="ghost" id="nf-alt">Alternativas</button></div>`);
+    <div class="linha"><button class="ghost" id="nf-comparar">Comparar</button><button class="ghost" id="nf-alt">Alternativas</button></div>
+    <button class="larga" id="nf-estoque">${ic('package')}Guardar no estoque</button>`);
+  $('nf-estoque').onclick = () => ligarProduto(a, [], x => painelQtd(x, { prod: a, direto: true }, renderNutricao));
   $('nf-comparar').onclick = () => escolherComparar(a);
   $('nf-alt').onclick = () => alternativas(a);
 }

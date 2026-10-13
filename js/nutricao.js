@@ -5,13 +5,13 @@
 const LS_DIETA = 'carga.dieta';
 // plano[diaDaSemana][refeição] = {op, esc}; diario[dia] = {refs: {ref: registro}, troca: {ref: célula}, agua};
 // estoque e fatores na unidade de compra (g cru, un)
-const DIETA_PADRAO = () => ({ plano: {}, estoque: {}, diario: {}, fatores: {}, medidas: [], periodo: 'semana', custom: {}, recentes: [] });
+const DIETA_PADRAO = () => ({ plano: {}, estoque: {}, diario: {}, fatores: {}, medidas: [], periodo: 'semana', custom: {}, recentes: [], carrinho: {}, marcas: {} });
 let dieta = Object.assign(DIETA_PADRAO(), lerLS(LS_DIETA, {}));
 Object.assign(ALIMENTOS, dieta.custom); // alimentos que você cadastrou (rótulo, código de barras)
 SECOES_NUT.push('Meus alimentos');
 const salvarDieta = () => localStorage.setItem(LS_DIETA, JSON.stringify(dieta));
 
-let nutTela = 'hoje', nutDia = new Date().getDay(), rasc = {}, corpoForm = false;
+let nutTela = 'hoje', nutDia = new Date().getDay(), rasc = {}, corpoForm = false, nutAberta = null, avAberto = {};
 const refMap = Object.fromEntries(REFEICOES.map(r => [r.id, r]));
 const ORDEM_SEMANA = [1, 2, 3, 4, 5, 6, 0];
 
@@ -87,13 +87,52 @@ function necessidade(dias) {
   return tot;
 }
 
+// ---------- estoque × cardápio ----------
+// só conta o que você controla no estoque (o que já comprou ou anotou em casa); o resto não vira "falta"
+const controla = a => ALIMENTOS[a] && a in dieta.estoque;
+const faltando = itens => itens.filter(i => !i.k && !i.av && controla(i.a) && dieta.estoque[i.a] + 1e-6 < compra(i.a, i.q));
+const minusc = s => s[0].toLowerCase() + s.slice(1);
+const listaE = xs => xs.length < 2 ? (xs[0] || '') : `${xs.slice(0, -1).join(', ')} e ${xs[xs.length - 1]}`;
+const nomesFalta = f => listaE(f.map(i => minusc(ALIMENTOS[i.a].nome)));
+// troca a carne, o pão ou a fruta por outra que tem em casa, quando a escolhida falta
+function comEstoque(ref, cel) {
+  const c = { op: cel.op, esc: { ...(cel.esc || {}) } };
+  for (const it of itensDe(ref, c)) {
+    if (!it.esc || !faltando([it]).length) continue;
+    const alt = ESCOLHAS[it.esc].ops.map(opId).find(a => {
+      if (a === it.a || !controla(a)) return false;
+      const novo = itensDe(ref, { ...c, esc: { ...c.esc, [it.esc]: a } }).find(x => x.esc === it.esc);
+      return !faltando([novo]).length;
+    });
+    if (alt) c.esc[it.esc] = alt;
+  }
+  return c;
+}
+// o plano de hoje não fecha com o estoque? devolve o que falta e, se houver, uma versão que dá pra fazer
+function sugestaoEstoque(key, ref) {
+  const cel = celDoDia(key, ref), f = faltando(itensDe(ref, cel));
+  if (!f.length) return null;
+  const r = refMap[ref];
+  for (const op of [cel.op, ...r.ops.map((_, i) => i).filter(i => i !== cel.op)]) {
+    const c = comEstoque(ref, { op, esc: cel.esc || {} });
+    if (!faltando(itensDe(ref, c)).length) return { f, cel: c };
+  }
+  return { f };
+}
+const estadoEstoque = (ref, cel) => {
+  const itens = itensDe(ref, cel), f = faltando(itens);
+  if (f.length) return { ok: false, txt: `Falta ${nomesFalta(f)}` };
+  const base = itens.filter(i => !i.k && !i.av), n = base.filter(i => controla(i.a)).length;
+  return !n ? null : { ok: true, txt: n === base.length ? 'Dá pra fazer com o que tem' : 'Nada em falta no estoque' };
+};
+
 // ---------- navegação interna ----------
-const NUT_TELAS = [['hoje', 'Hoje'], ['cardapio', 'Cardápio'], ['carrinho', 'Carrinho'], ['estoque', 'Estoque'], ['produtos', 'Produtos']];
+const NUT_TELAS = [['hoje', 'Hoje'], ['cardapio', 'Cardápio'], ['carrinho', 'Compras'], ['estoque', 'Despensa']];
 function renderNutricao() {
   $('nut-telas').innerHTML = NUT_TELAS.map(([id, nome]) =>
     `<button role="tab" data-nt="${id}" aria-selected="${id === nutTela}" class="${id === nutTela ? 'ativo' : ''}">${nome}</button>`).join('');
   $('nut-telas').querySelectorAll('[data-nt]').forEach(b => b.onclick = () => { nutTela = b.dataset.nt; renderNutricao(); });
-  ({ hoje: renderNutHoje, cardapio: renderCardapio, carrinho: renderCarrinho, estoque: renderEstoque, produtos: renderProdutos })[nutTela]($('nut-corpo'));
+  ({ hoje: renderNutHoje, cardapio: renderCardapio, carrinho: renderCarrinho, estoque: renderEstoque })[nutTela]($('nut-corpo'));
 }
 
 const tilesMacro = (m, meta) => `<div class="tiles t4">
@@ -101,6 +140,12 @@ const tilesMacro = (m, meta) => `<div class="tiles t4">
   ${tile(`${Math.round(m[1])}<small>g</small>`, meta ? `proteína · ${Math.round(meta[1])}` : 'proteína')}
   ${tile(`${Math.round(m[2])}<small>g</small>`, meta ? `carbo · ${Math.round(meta[2])}` : 'carbo')}
   ${tile(`${Math.round(m[3])}<small>g</small>`, meta ? `gordura · ${Math.round(meta[3])}` : 'gordura')}</div>`;
+// barras do dia: comido × plano
+const barrasMacro = (m, meta) => `<div class="nut-barras">${[['Calorias', 'kcal'], ['Proteína', 'g'], ['Carbo', 'g'], ['Gordura', 'g']].map(([nome, u], i) => {
+  const v = i ? Math.round(m[i]) : kcal(m[i]), alvo = i ? Math.round(meta[i]) : kcal(meta[i]), pct = meta[i] ? m[i] / meta[i] * 100 : 0;
+  return `<div class="nut-barra"><div class="nut-barra-cab"><span>${nome}</span><span class="num"><b>${v}</b> de ${alvo} ${u}</span></div>
+    <div class="barra"><div style="width:${Math.min(100, pct)}%;background:var(${pct > 110 ? '--atencao' : '--acao'})"></div></div></div>`;
+}).join('')}</div>`;
 const macroLinha = m => `${kcal(m[0])} kcal · P ${Math.round(m[1])} g · C ${Math.round(m[2])} g · G ${Math.round(m[3])} g`;
 
 // chips das escolhas (carne, pão, fruta) de uma célula
@@ -118,12 +163,14 @@ function ligaEscolhas(el, ref, cel, aoMudar) {
     })));
   });
 }
-function folhaOpcoes(ref, cel, aoMudar) {
+// opções da refeição com o que dá pra fazer com o estoque; adaptar = já troca a carne/fruta pela que tem em casa (Hoje)
+function folhaOpcoes(ref, cel, aoMudar, adaptar) {
   const r = refMap[ref];
-  abrirFolha(r.nome, r.ops.map((o, i) => ({
-    ic: 'fork-knife', txt: `${i + 1}. ${o.nome}`, sel: i === cel.op, valor: `${kcal(macros(itensDe(ref, { ...cel, op: i }))[0])} kcal`,
-    acao: () => aoMudar({ op: i, esc: cel.esc || {} }),
-  })));
+  abrirFolha(r.nome, r.ops.map((o, i) => {
+    const base = { op: i, esc: cel.esc || {} }, c = adaptar ? comEstoque(ref, base) : base, est = estadoEstoque(ref, c);
+    return { ic: est ? (est.ok ? 'check-circle' : 'package') : 'fork-knife', txt: `${i + 1}. ${o.nome}`, sel: i === cel.op,
+      det: est && est.txt, detCls: est ? (est.ok ? 'c-ok' : 'c-atencao') : '', valor: `${kcal(macros(itensDe(ref, c))[0])} kcal`, acao: () => aoMudar(c) };
+  }));
 }
 
 // ---------- Hoje ----------
@@ -166,10 +213,25 @@ function renderNutHoje(el) {
   if (d.refs.extra) comido = somaM(comido, macros(d.refs.extra.itens));
   const agua = d.agua || 0, fds = fimDeSemanaKeys();
   const hojeAd = aderencia([key]), sem = aderencia(Array.from({ length: 7 }, (_, i) => dayKey(Date.now() - i * 864e5)));
+  const prox = REFEICOES.find(r => !d.refs[r.id]), feitas = REFEICOES.length - REFEICOES.filter(r => !d.refs[r.id]).length;
+  if (nutAberta && prox && nutAberta === prox.id) nutAberta = null;
+  // demais refeições: linhas recolhidas; a que você abriu vira cartão completo no lugar
+  let lista = '', linhas = [];
+  const fechaLista = () => { if (linhas.length) lista += `<div class="lista">${linhas.join('')}</div>`; linhas = []; };
+  for (const r of REFEICOES) {
+    if (prox && r.id === prox.id) continue;
+    if (r.id === nutAberta) { fechaLista(); lista += cardRefeicao(key, r, d.refs[r.id], 'aberta'); } else linhas.push(linhaRefeicao(key, r, d.refs[r.id]));
+  }
+  fechaLista();
   el.innerHTML = `
-    <div class="topo-data"><span>${dataLonga(Date.now())}</span>${fds ? `<span class="tag tag-atencao">Refeição livre: ${livresNoFds(fds)} de 1</span>` : ''}</div>
-    <div class="secao"><div class="kicker">Comido hoje</div>${tilesMacro(comido, plano)}
-      ${hojeAd.feitas ? `<p class="mudo" id="nut-aderencia">Seguiu a dieta em ${hojeAd.fieis} de ${plural(hojeAd.feitas, 'refeição', 'refeições')} hoje${sem.feitas > hojeAd.feitas ? ` · ${Math.round(sem.fieis / sem.feitas * 100)}% nos últimos 7 dias` : ''}.</p>` : ''}</div>
+    <div class="topo-data"><span>${dataLonga(Date.now())}</span><span class="tag${feitas === REFEICOES.length ? ' tag-ok' : ''}">${ic('fork-knife')}${feitas} de ${REFEICOES.length} refeições</span></div>
+    ${prox ? cardRefeicao(key, prox, null, 'hero') : `<div class="card hero"><div class="hero-txt"><div class="kicker azul">Dia completo</div>
+      <div class="titulo-2">Todas as refeições registradas</div><div class="mudo">${kcal(comido[0])} kcal hoje. Algo a mais entra em "Fora do plano".</div></div></div>`}
+    <div class="card nut-dia">
+      <div class="nut-cab"><span class="kicker">Comido hoje</span>${fds ? `<span class="tag tag-atencao">${ic('fire')}Livre: ${livresNoFds(fds)} de 1</span>` : ''}</div>
+      ${barrasMacro(comido, plano)}
+      ${hojeAd.feitas ? `<p class="mudo" id="nut-aderencia">Seguiu a dieta em ${hojeAd.fieis} de ${plural(hojeAd.feitas, 'refeição', 'refeições')} hoje${sem.feitas > hojeAd.feitas ? ` · ${Math.round(sem.fieis / sem.feitas * 100)}% nos últimos 7 dias` : ''}.</p>` : ''}
+    </div>
     <div class="card nut-agua">
       <div class="nut-cab"><h3>${ic('drop')}Água</h3><span class="num"><b>${num(agua / 1000)}</b> de ${num(META_AGUA / 1000)} L</span></div>
       <div class="barra"><div style="width:${Math.min(100, agua / META_AGUA * 100)}%;background:var(--acao)"></div></div>
@@ -178,47 +240,86 @@ function renderNutHoje(el) {
         <button data-agua="250">+250 ml</button><button data-agua="500">+500 ml</button>
       </div>
     </div>
-    ${REFEICOES.map(r => cardRefeicao(key, r, d.refs[r.id])).join('')}
+    <div class="secao"><div class="kicker">Refeições de hoje</div>${lista}</div>
     ${cardExtra(d.refs.extra)}`;
   el.querySelectorAll('[data-agua]').forEach(b => b.onclick = () => {
     const dr = diaReg(key);
     dr.agua = Math.max(0, (dr.agua || 0) + +b.dataset.agua);
     salvarDieta(); renderNutHoje(el);
   });
-  for (const r of REFEICOES) ligaRefeicao(el.querySelector(`[data-ref="${r.id}"]`), key, r, el);
+  el.querySelectorAll('[data-abrir]').forEach(b => b.onclick = () => { nutAberta = b.dataset.abrir; renderNutHoje(el); });
+  for (const r of REFEICOES) {
+    const card = el.querySelector(`.nut-ref[data-ref="${r.id}"]`);
+    if (card) ligaRefeicao(card, key, r, el);
+  }
   ligaExtra(el.querySelector('[data-ref="extra"]'), key, el);
 }
 
-const cabRef = (r, tag) => `<div class="nut-cab"><div><div class="kicker">${esc(r.hora)}</div><h3>${esc(r.nome)}</h3></div>${tag}</div>`;
+// linha recolhida de uma refeição (toque para abrir)
+function linhaRefeicao(key, r, reg) {
+  const cel = celDoDia(key, r.id), falta = !reg && faltando(itensDe(r.id, cel)).length;
+  const det = reg ? (reg.livre ? 'Refeição livre' : `Comido ${dataHora(reg.ts)} · ${kcal(macros(reg.itens)[0])} kcal`)
+    : `${r.ops.length > 1 ? `${cel.op + 1}. ` : ''}${r.ops[cel.op].nome} · ${kcal(macros(rascunho(key, r.id))[0])} kcal`;
+  return `<button class="linha-lista nut-linha${reg ? ' feito' : ''}" data-abrir="${r.id}">
+    <span class="nut-hora num">${/^\d/.test(r.hora) ? esc(r.hora) : ''}</span>
+    <span class="ll-txt"><span class="ll-nome">${esc(r.nome)}${/^\d/.test(r.hora) ? '' : ` <small class="c-3">${esc(r.hora)}</small>`}</span><span class="ll-det">${esc(det)}</span></span>
+    ${reg ? `<span class="c-ok">${ic(reg.fiel || reg.livre ? 'check-circle-fill' : 'check')}</span>` : falta ? `<span class="tag tag-atencao">${ic('package')}falta</span>` : ''}${ic('caret-down', 'chev')}</button>`;
+}
+
+const cabRef = (r, tag, modo) => `<div class="nut-cab"><div><div class="kicker${modo === 'hero' ? ' azul' : ''}">${modo === 'hero' ? `Próxima refeição · ${esc(r.hora)}` : esc(r.hora)}</div>
+  <h3${modo === 'hero' ? ' class="titulo-2"' : ''}>${esc(r.nome)}</h3></div><div class="nut-cab-dir">${tag}${modo === 'aberta' ? `<button class="btn-ic" data-fechar aria-label="Recolher">${ic('caret-down', 'ic-18 vira')}</button>` : ''}</div></div>`;
 const pillsItens = itens => `<div class="pills">${itens.map(i => `<span class="pill">${esc(nomeIt(i))} ${i.k ? `${kcal(i.k[0])} kcal` : qtdTxt(i.a, i.q)}</span>`).join('')}</div>`;
 
 // linha editável de um item (peso, trocar, remover)
-const linhaItem = (it, i) => `<div class="nut-it">
+const linhaItem = (it, i) => `<div class="nut-it${it.k || it.av || (ALIMENTOS[it.a] && ALIMENTOS[it.a].av) ? '' : ' pesar'}">
   <button class="nome nut-troca" data-troca="${i}">${esc(nomeIt(it))}${it.k ? '<small>só calorias</small>' : it.av ? '<small>à vontade</small>' : ''}</button>
   ${it.k ? '<span class="nut-q-fixo"></span>' : `<input type="number" inputmode="decimal" min="0" step="any" class="num" data-i="${i}" value="${it.q}" aria-label="${esc(nomeIt(it))} em ${unTxt(it.a)}">
   <span class="u">${unTxt(it.a)}</span>`}<span class="k num" data-k="${i}">${kcal(macros([it])[0])}</span>
   <button class="btn-ic nut-rm" data-rm="${i}" aria-label="Tirar ${esc(nomeIt(it))}">${ic('x', 'ic-18')}</button></div>`;
 
-function cardRefeicao(key, r, reg) {
-  if (reg && reg.livre) return `<div class="card nut-ref feito" data-ref="${r.id}">${cabRef(r, `<span class="tag tag-atencao">${ic('fire')}Refeição livre</span>`)}
+// o que se pesa vem primeiro; a salada à vontade fica numa linha só (toque para abrir)
+function itensPesagem(ref, itens) {
+  const idx = itens.map((it, i) => [it, i]), av = idx.filter(([it]) => it.av), pesa = idx.filter(([it]) => !it.av);
+  let html = pesa.map(([it, i]) => linhaItem(it, i)).join('');
+  if (av.length) {
+    const g = av.reduce((t, [it]) => t + gramas(it.a, it.q), 0);
+    html += avAberto[ref] || av.length === 1 ? av.map(([it, i]) => linhaItem(it, i)).join('')
+      : `<button class="nut-it nut-av" data-av><span class="nome">Salada à vontade<small>${esc(listaE(av.map(([it]) => minusc(ALIMENTOS[it.a].nome))))}</small></span>
+        <span class="u num">${Math.round(g)} g</span><span class="k num">${kcal(macros(av.map(([it]) => it))[0])}</span>${ic('caret-down', 'ic-18 chev')}</button>`;
+  }
+  return html;
+}
+
+function cardRefeicao(key, r, reg, modo) {
+  const cls = `card nut-ref${modo === 'hero' ? ' hero' : ''}`;
+  if (reg && reg.livre) return `<div class="${cls} feito" data-ref="${r.id}">${cabRef(r, `<span class="tag tag-atencao">${ic('fire')}Refeição livre</span>`, modo)}
     <button class="btn-texto neutro" data-desfazer>${ic('arrow-counter-clockwise')}Desfazer</button></div>`;
   if (reg) {
-    return `<div class="card nut-ref feito" data-ref="${r.id}">${cabRef(r, `<span class="tag ${reg.fiel ? 'tag-ok' : ''}">${ic(reg.fiel ? 'check-circle-fill' : 'check')}Comido ${dataHora(reg.ts)}</span>`)}
+    return `<div class="${cls} feito" data-ref="${r.id}">${cabRef(r, `<span class="tag ${reg.fiel ? 'tag-ok' : ''}">${ic(reg.fiel ? 'check-circle-fill' : 'check')}Comido ${dataHora(reg.ts)}</span>`, modo)}
       <div class="mudo">${reg.fiel ? esc(r.ops[reg.op] ? r.ops[reg.op].nome : '') : 'Diferente do plano'}</div>
       ${pillsItens(reg.itens)}
       <div class="nut-macro">${macroLinha(macros(reg.itens))}</div>
       <button class="btn-texto neutro" data-desfazer>${ic('arrow-counter-clockwise')}Desfazer</button></div>`;
   }
   const cel = celDoDia(key, r.id), itens = rascunho(key, r.id), ontem = (dieta.diario[ontemKey()] || { refs: {} }).refs[r.id];
-  return `<div class="card nut-ref" data-ref="${r.id}">${cabRef(r, `<span class="tag num" data-kcal>${kcal(macros(itens)[0])} kcal</span>`)}
+  const sug = !rasc[r.id] && sugestaoEstoque(key, r.id);
+  let aviso = '';
+  if (sug) {
+    const troca = sug.cel && (sug.cel.op !== cel.op ? `a opção ${sug.cel.op + 1}, ${minusc(r.ops[sug.cel.op].nome)}`
+      : `com ${nomesFalta(itensDe(r.id, sug.cel).filter(i => i.esc && !itensDe(r.id, cel).some(x => x.a === i.a)))}`);
+    aviso = `<div class="nut-falta-aviso">${ic('package', 'ic-18')}<span>Falta ${esc(nomesFalta(sug.f))} em casa.${troca ? ` Dá pra fazer ${esc(troca)}.` : ''}</span>
+      ${troca ? '<button class="btn-texto" data-usar>Trocar</button>' : ''}</div>`;
+  }
+  return `<div class="${cls}" data-ref="${r.id}">${cabRef(r, `<span class="tag num" data-kcal>${kcal(macros(itens)[0])} kcal</span>`, modo)}
     ${r.ops.length > 1 ? `<button class="nut-op" data-trocar><span>${cel.op + 1}. ${esc(r.ops[cel.op].nome)}</span>${ic('caret-down', 'ic-18')}</button>` : `<div class="mudo">${esc(r.ops[0].nome)}</div>`}
+    ${aviso}
     ${rasc[r.id] ? '' : chipsEscolha(r.id, cel)}
-    <div class="nut-itens">${itens.map(linhaItem).join('')}</div>
+    <div class="nut-itens">${itensPesagem(r.id, itens)}</div>
     <div class="nut-mais"><button class="btn-texto" data-add>${ic('plus', 'ic-18')}Adicionar</button>
       ${ontem && ontem.itens ? `<button class="btn-texto neutro" data-ontem>${ic('arrow-counter-clockwise', 'ic-18')}Repetir ontem</button>` : ''}
       ${rasc[r.id] ? `<button class="btn-texto neutro" data-plano>Voltar ao plano</button>` : ''}</div>
     <div class="nut-macro" data-macro>${macroLinha(macros(itens))}</div>
-    <div class="nut-acoes"><button data-comi>${ic('check')}Comi</button><button class="btn-texto neutro" data-livre>Refeição livre</button></div>
+    <div class="nut-acoes"><button class="${modo === 'hero' ? 'grande' : ''}" data-comi>${ic('check')}Comi</button><button class="btn-texto neutro" data-livre>Refeição livre</button></div>
   </div>`;
 }
 const dataHora = ts => { const d = new Date(ts); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
@@ -244,6 +345,8 @@ function ligaItens(card, pegar, mudou, aoDigitar) {
 
 function ligaRefeicao(card, key, r, el) {
   const d = dieta.diario[key], reg = d && d.refs[r.id];
+  const bf = card.querySelector('[data-fechar]');
+  if (bf) bf.onclick = () => { nutAberta = null; renderNutHoje(el); };
   if (reg) {
     card.querySelector('[data-desfazer]').onclick = () => {
       for (const [a, v] of Object.entries(reg.baixa || {})) dieta.estoque[a] = (dieta.estoque[a] || 0) + v;
@@ -255,8 +358,12 @@ function ligaRefeicao(card, key, r, el) {
   const cel = celDoDia(key, r.id);
   const trocar = nova => { diaReg(key).troca[r.id] = nova; delete rasc[r.id]; salvarDieta(); renderNutHoje(el); };
   const bt = card.querySelector('[data-trocar]');
-  if (bt) bt.onclick = () => folhaOpcoes(r.id, cel, trocar);
+  if (bt) bt.onclick = () => folhaOpcoes(r.id, cel, trocar, true);
   ligaEscolhas(card, r.id, cel, trocar);
+  const bu = card.querySelector('[data-usar]');
+  if (bu) bu.onclick = () => { const sg = sugestaoEstoque(key, r.id); trocar(sg.cel); toast(`${r.nome}: trocado pelo que tem em casa`); };
+  const bav = card.querySelector('[data-av]');
+  if (bav) bav.onclick = () => { avAberto[r.id] = true; renderNutHoje(el); };
   // o primeiro toque em qualquer item vira rascunho; a partir daí a refeição é "a sua versão"
   const pegar = () => rasc[r.id] || (rasc[r.id] = copiaItens(itensDe(r.id, cel)));
   ligaItens(card, pegar, its => { rasc[r.id] = its; renderNutHoje(el); }, (its, i) => {
@@ -364,25 +471,39 @@ function listaCompras() {
   });
 }
 
+// carrinho do mercado: o que você já pegou fica marcado (dá pra desmarcar) e só entra no estoque em "Guardar compras"
+// dieta.carrinho[a] = {q (unidade de compra), prod (produto escaneado, opcional)}
+const unCompra = a => ALIMENTOS[a].un === 'un' ? (ALIMENTOS[a].nu || 'un') : 'g';
 function renderCarrinho(el) {
-  const dias = dieta.periodo === 'mes' ? 30 : 7, lista = listaCompras();
+  const dias = dieta.periodo === 'mes' ? 30 : 7, lista = listaCompras(), cart = dieta.carrinho;
   const ate = dataBr(new Date(hojeKey() + 'T12:00').getTime() + (dias - 1) * 864e5);
-  const comprar = lista.filter(l => l.falta > 0), tem = lista.filter(l => l.falta <= 0);
-  const linha = l => `<div class="linha-lista com-acao" data-a="${l.a}">
+  const comprar = lista.filter(l => l.falta > 0 || cart[l.a]), tem = lista.filter(l => l.falta <= 0 && !cart[l.a]);
+  const extras = Object.keys(cart).filter(a => ALIMENTOS[a] && !comprar.some(l => l.a === a));
+  const pegos = comprar.filter(l => cart[l.a]).length + extras.length, total = comprar.length + extras.length;
+  const linha = l => {
+    const c = cart[l.a], prod = c && c.prod && ALIMENTOS[c.prod];
+    return `<div class="linha-lista com-acao nut-compra${c ? ' pego' : ''}" data-a="${l.a}">
+      <button class="btn-ic nut-check" data-comprei="${l.a}" aria-label="${c ? 'Mudar' : 'Peguei'} ${esc(nomeCompra(l.a))}" aria-pressed="${!!c}">${ic(c ? 'check-circle-fill' : 'check-circle')}</button>
       <div class="ll-txt"><span class="ll-nome">${esc(nomeCompra(l.a))}</span>
-      <span class="ll-det">precisa ${fmtCompra(l.a, l.precisa, true)}${l.tem ? ` · tem ${fmtCompra(l.a, l.tem, true)}` : ''}</span></div>
-      <b class="num nut-falta">${fmtCompra(l.a, l.falta)}</b>
-      <button class="btn-ic" data-comprei="${l.a}" aria-label="Comprei ${esc(nomeCompra(l.a))}">${ic('check-circle')}</button></div>`;
+      <span class="ll-det">${c ? `pegou ${fmtCompra(l.a, c.q, true)}${prod ? ` · ${esc(prod.nome)}` : ''}` : `precisa ${fmtCompra(l.a, l.precisa, true)}${l.tem ? ` · tem ${fmtCompra(l.a, l.tem, true)}` : ''}`}</span></div>
+      <b class="num nut-falta">${l.falta > 0 ? fmtCompra(l.a, l.falta) : ''}</b></div>`;
+  };
   el.innerHTML = `
     <div class="seg" role="tablist" id="nut-periodo">
       <button role="tab" data-per="semana" class="${dieta.periodo !== 'mes' ? 'ativo' : ''}" aria-selected="${dieta.periodo !== 'mes'}">Semana</button>
       <button role="tab" data-per="mes" class="${dieta.periodo === 'mes' ? 'ativo' : ''}" aria-selected="${dieta.periodo === 'mes'}">Mês (30 dias)</button>
     </div>
-    <p class="mudo">Do cardápio de hoje até ${ate}, já em peso cru, menos o que você tem no estoque, arredondado para cima. Toque em ${ic('check-circle', 'ic-16')} quando comprar: entra no estoque.</p>
-    ${comprar.length ? SECOES_NUT.map(s => {
-      const ls = comprar.filter(l => ALIMENTOS[l.a].sec === s);
+    ${total ? `<div class="card nut-mercado">
+      <div class="nut-cab"><h3>${ic('shopping-cart')}No carrinho</h3><span class="num" id="nut-pegos"><b>${pegos}</b> de ${total}</span></div>
+      <div class="barra"><div style="width:${total ? pegos / total * 100 : 0}%;background:var(--ok)"></div></div>
+      <button class="ghost larga" id="bt-escanear-compra">${ic('barcode')}Escanear produto</button>
+    </div>` : ''}
+    <p class="mudo">Do cardápio de hoje até ${ate}, em peso cru, menos o que tem em casa, arredondado para cima. Toque no círculo quando pegar o item e diga quanto pegou.</p>
+    ${total ? SECOES_NUT.map(s => {
+      const ls = [...comprar, ...extras.map(a => ({ a, precisa: 0, tem: 0, falta: 0 }))].filter(l => ALIMENTOS[l.a].sec === s);
       return ls.length ? `<div class="secao"><div class="kicker">${s}</div><div class="lista">${ls.map(linha).join('')}</div></div>` : '';
     }).join('') : `<div class="vazio">${ic('check-circle')}<span>O estoque cobre o período todo.</span></div>`}
+    ${pegos ? `<button class="grande larga" id="bt-guardar">${ic('package')}Guardar compras (${pegos})</button>` : ''}
     ${comprar.length ? `<button class="ghost larga" id="bt-copiar-lista">${ic('list-checks')}Copiar lista</button>` : ''}
     ${tem.length ? `<div class="secao"><div class="kicker">Já tem em casa</div><p class="mudo">${tem.map(l => esc(nomeCompra(l.a))).join(', ')}</p></div>` : ''}
     <div class="card">
@@ -394,12 +515,20 @@ function renderCarrinho(el) {
       }).join('')}</div>
     </div>`;
   el.querySelectorAll('[data-per]').forEach(b => b.onclick = () => { dieta.periodo = b.dataset.per; salvarDieta(); renderCarrinho(el); });
+  const sugerido = a => { const l = lista.find(x => x.a === a); return l ? l.falta : 0; };
   el.querySelectorAll('[data-comprei]').forEach(b => b.onclick = () => {
-    const l = comprar.find(x => x.a === b.dataset.comprei);
-    dieta.estoque[l.a] = (dieta.estoque[l.a] || 0) + l.falta;
-    salvarDieta(); renderCarrinho(el);
-    toast(`${nomeCompra(l.a)} no estoque`);
+    const a = b.dataset.comprei;
+    painelQtd(a, { sugerido: sugerido(a), atual: cart[a] && cart[a].q, prod: cart[a] && cart[a].prod, noCarrinho: !!cart[a] }, () => renderCarrinho(el));
   });
+  const be = $('bt-escanear-compra');
+  if (be) be.onclick = () => scannerCodigo(id => ligarProduto(id, comprar.map(l => l.a), a =>
+    painelQtd(a, { sugerido: sugerido(a), prod: id, atual: cart[a] && cart[a].q }, () => renderCarrinho(el))));
+  const bg = $('bt-guardar');
+  if (bg) bg.onclick = () => {
+    const n = guardarCarrinho();
+    salvarDieta(); renderCarrinho(el);
+    toast(`${plural(n, 'item guardado', 'itens guardados')} no estoque`);
+  };
   el.querySelectorAll('[data-fator]').forEach(inp => inp.onchange = () => {
     const v = parseFloat(inp.value.replace(',', '.'));
     if (!(v > 0)) return;
@@ -409,38 +538,119 @@ function renderCarrinho(el) {
   const bc = $('bt-copiar-lista');
   if (bc) bc.onclick = () => {
     const txt = SECOES_NUT.map(s => {
-      const ls = comprar.filter(l => ALIMENTOS[l.a].sec === s);
+      const ls = comprar.filter(l => ALIMENTOS[l.a].sec === s && l.falta > 0);
       return ls.length ? `${s}\n${ls.map(l => `- ${nomeCompra(l.a)}: ${fmtCompra(l.a, l.falta)}`).join('\n')}` : '';
     }).filter(Boolean).join('\n\n');
     (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast('Lista copiada'), () => toast('Não deu para copiar'));
   };
 }
+function guardarCarrinho() {
+  const ents = Object.entries(dieta.carrinho);
+  for (const [a, c] of ents) {
+    dieta.estoque[a] = (dieta.estoque[a] || 0) + c.q;
+    if (c.prod) dieta.marcas[a] = c.prod;
+  }
+  dieta.carrinho = {};
+  return ents.length;
+}
 
-// ---------- Estoque ----------
-function renderEstoque(el) {
-  const nec7 = necessidade(7), usados = new Set(Object.keys(nec7));
-  const ids = Object.keys(ALIMENTOS).filter(a => usados.has(a) || dieta.estoque[a] > 0);
-  const duracao = a => {
-    const dia = (nec7[a] || 0) / 7, tem = dieta.estoque[a] || 0;
-    if (!dia) return '';
-    const d = Math.floor(tem / dia);
-    return d < 3 ? `<span class="tag tag-atencao">${tem ? `acaba em ${plural(d, 'dia', 'dias')}` : 'em falta'}</span>`
-      : `<span class="tag tag-ok">${d >= 30 ? '30+ dias' : plural(d, 'dia', 'dias')}</span>`;
+// "quanto você pegou?" — já vem com o sugerido (ou o peso da embalagem escaneada)
+// o: {sugerido, atual, prod, noCarrinho, direto (vai direto pro estoque, sem carrinho)}
+function painelQtd(a, o, depois) {
+  const al = ALIMENTOS[a], un = unCompra(a), prod = o.prod && ALIMENTOS[o.prod];
+  const doPacote = prod && prod.pacote && al.un !== 'un' ? prod.pacote : null;
+  const ini = o.atual ?? doPacote ?? (o.sugerido || (al.un === 'un' ? (al.pac ? al.pac[0] : 1) : 500));
+  const atalhos = al.un === 'un' ? (al.pac ? [1, 2, 3].map(n => [n * al.pac[0], `${n} ${n === 1 ? al.pac[1] : al.pac[2]}`]) : [])
+    : [[500, '500 g'], [1000, '1 kg'], [2000, '2 kg']];
+  if (doPacote && !atalhos.some(x => x[0] === doPacote)) atalhos.unshift([doPacote, `embalagem ${fmtCompra(a, doPacote, true)}`]);
+  if (o.sugerido && !atalhos.some(x => x[0] === o.sugerido)) atalhos.unshift([o.sugerido, `lista ${fmtCompra(a, o.sugerido, true)}`]);
+  abrirPainel(`<div class="kicker folha-titulo">${o.direto ? 'Guardar no estoque' : 'Quanto você pegou?'}</div>
+    <h3 class="nut-ficha-nome">${esc(nomeCompra(a))}</h3>
+    ${prod ? `<div class="mudo">${esc(prod.nome)}</div>${prod.info ? resumoProduto(prod.m, prod.info) : ''}` : ''}
+    ${o.sugerido ? `<p class="mudo">A lista sugere ${fmtCompra(a, o.sugerido)}.</p>` : ''}
+    <div class="linha nut-qtd"><input id="nq-v" type="number" inputmode="decimal" min="0" step="any" class="num" value="${ini}" aria-label="Quantidade em ${un}"><span class="u">${un}</span></div>
+    ${atalhos.length ? `<div class="chips">${atalhos.map(([v, t]) => `<button class="chip" data-q="${v}">${esc(t)}</button>`).join('')}</div>` : ''}
+    <button class="larga" id="nq-ok">${o.direto ? 'Guardar' : o.noCarrinho ? 'Atualizar' : 'Pôr no carrinho'}</button>
+    ${o.noCarrinho ? `<button class="ghost larga" id="nq-tirar">${ic('x')}Tirar do carrinho</button>` : ''}`);
+  $('folha').querySelectorAll('[data-q]').forEach(b => b.onclick = () => { $('nq-v').value = b.dataset.q; });
+  $('nq-v').select();
+  $('nq-ok').onclick = () => {
+    const q = parseFloat($('nq-v').value.replace(',', '.'));
+    if (!(q > 0)) return toast('Coloque a quantidade');
+    if (o.direto) {
+      dieta.estoque[a] = (dieta.estoque[a] || 0) + q;
+      if (o.prod) dieta.marcas[a] = o.prod;
+      toast(`${nomeCompra(a)} no estoque`);
+    } else dieta.carrinho[a] = { q, ...(o.prod ? { prod: o.prod } : {}) };
+    salvarDieta(); fecharPainel(); depois();
   };
+  const bt = $('nq-tirar');
+  if (bt) bt.onclick = () => { delete dieta.carrinho[a]; salvarDieta(); fecharPainel(); depois(); };
+}
+
+// produto escaneado → qual item da dieta ele é? (fica lembrado para a próxima vez)
+function ligarProduto(id, preferidos, pronto) {
+  const al = ALIMENTOS[id];
+  if (al.sec !== 'Meus alimentos') return pronto(id); // já é um alimento da dieta
+  if (al.liga && ALIMENTOS[al.liga]) return pronto(al.liga);
+  const daDieta = Object.keys(ALIMENTOS).filter(a => ALIMENTOS[a].sec !== 'Meus alimentos');
+  const ordem = [...preferidos.filter(a => daDieta.includes(a)), ...daDieta.filter(a => !preferidos.includes(a))];
+  const liga = a => { al.liga = a; if (dieta.custom[id]) dieta.custom[id].liga = a; salvarDieta(); pronto(a); };
+  abrirFolha(`${al.nome}: é qual item?`, [
+    ...ordem.map(a => ({ ic: preferidos.includes(a) ? 'shopping-cart' : 'fork-knife', txt: nomeCompra(a), acao: () => liga(a) })),
+    { ic: 'plus', txt: 'Item à parte (fora da dieta)', acao: () => pronto(id) },
+  ]);
+}
+
+// ---------- Despensa (estoque + produtos) ----------
+// uso nos próximos 7 dias: cru por dia e a porção pronta mais comum
+function usoSemana() {
+  const uso = {}, hoje = new Date(hojeKey() + 'T12:00').getTime();
+  for (let i = 0; i < 7; i++) {
+    const key = dayKey(hoje + i * 864e5);
+    for (const r of REFEICOES) for (const { a, q } of itensDe(r.id, celDoDia(key, r.id))) {
+      const u = uso[a] || (uso[a] = { cru: 0, vezes: 0, q: 0 });
+      u.cru += compra(a, q); u.vezes++; u.q += q;
+    }
+  }
+  return uso;
+}
+// "2 kg cru ≈ 10 porções de 150 g · dá até qui, 22/10"
+function previsao(a, uso) {
+  const u = uso[a], tem = dieta.estoque[a] || 0;
+  if (!u || !u.cru) return null;
+  const dias = tem / (u.cru / 7), porcao = u.q / u.vezes, al = ALIMENTOS[a];
+  const porcoes = al.un === 'un' ? 0 : Math.floor(tem / fator(a) / porcao + 1e-6);
+  return { dias, fim: Date.now() + Math.floor(dias) * 864e5, txt: [porcoes ? `≈ ${plural(porcoes, `porção de ${Math.round(porcao)} g`, `porções de ${Math.round(porcao)} g`)}` : '',
+    tem ? (dias >= 30 ? 'dá pra 30+ dias' : `dá até ${dataCurta(Date.now() + Math.floor(dias) * 864e5)}`) : ''].filter(Boolean).join(' · ') };
+}
+function renderEstoque(el) {
+  const uso = usoSemana(), ids = Object.keys(ALIMENTOS).filter(a => uso[a] || dieta.estoque[a] > 0);
+  const tag = p => !p ? '' : p.dias < 1 ? `<span class="tag tag-serio">em falta</span>` : p.dias < 3 ? `<span class="tag tag-atencao">${plural(Math.floor(p.dias), 'dia', 'dias')}</span>`
+    : `<span class="tag tag-ok">${p.dias >= 30 ? '30+ dias' : plural(Math.floor(p.dias), 'dia', 'dias')}</span>`;
+  // próximos furos: o que você controla e acaba nos próximos 7 dias
+  const furos = ids.filter(a => controla(a)).map(a => [a, previsao(a, uso)]).filter(([, p]) => p && p.dias < 7).sort((x, y) => x[1].dias - y[1].dias);
   el.innerHTML = `
-    <p class="mudo">O que você tem em casa, em peso cru ou unidades. "Comi" desconta daqui e o que você marca como comprado no carrinho soma aqui.</p>
+    ${furos.length ? `<div class="aviso-card">${ic('package')}<div><b>Vai acabar esta semana</b><ul>${furos.slice(0, 5).map(([a, p]) =>
+      `<li>${esc(nomeCompra(a))}: ${p.dias < 1 ? 'já acabou' : `até ${dataCurta(p.fim)}`}</li>`).join('')}</ul></div></div>` : ''}
+    <p class="mudo">O que você tem em casa, em peso cru ou unidades. "Comi" desconta daqui e "Guardar compras" soma aqui. A previsão usa as porções do seu cardápio.</p>
     ${SECOES_NUT.map(s => {
       const ls = ids.filter(a => ALIMENTOS[a].sec === s);
-      return ls.length ? `<div class="secao"><div class="kicker">${s}</div><div class="lista">${ls.map(a => `
-        <div class="linha-lista nut-est"><div class="ll-txt"><span class="ll-nome">${esc(nomeCompra(a))}</span><span class="ll-det">${duracao(a)}</span></div>
+      return ls.length ? `<div class="secao"><div class="kicker">${s}</div><div class="lista">${ls.map(a => {
+        const p = controla(a) ? previsao(a, uso) : null, marca = dieta.marcas[a] && ALIMENTOS[dieta.marcas[a]];
+        return `<div class="linha-lista nut-est"><div class="ll-txt"><span class="ll-nome">${esc(nomeCompra(a))} ${tag(p)}</span>
+          <span class="ll-det">${[marca ? esc(marca.nome) : '', p ? p.txt : ''].filter(Boolean).join(' · ')}</span></div>
           <input type="number" inputmode="decimal" min="0" step="any" class="num" data-est="${a}" value="${+(dieta.estoque[a] || 0).toFixed(1)}" aria-label="${esc(nomeCompra(a))} em casa">
-          <span class="u">${ALIMENTOS[a].un === 'un' ? (ALIMENTOS[a].nu || 'un') : 'g'}</span></div>`).join('')}</div></div>` : '';
-    }).join('')}`;
+          <span class="u">${unCompra(a)}</span></div>`;
+      }).join('')}</div></div>` : '';
+    }).join('')}
+    <div class="secao"><div class="kicker">Produtos</div><div class="tela justa" id="nut-produtos"></div></div>`;
   el.querySelectorAll('[data-est]').forEach(inp => inp.onchange = () => {
     const v = parseFloat(inp.value.replace(',', '.'));
     dieta.estoque[inp.dataset.est] = v > 0 ? v : 0;
     salvarDieta(); renderEstoque(el);
   });
+  renderProdutos($('nut-produtos'));
 }
 
 // ---------- Corpo (peso e medidas, na aba Progresso) ----------

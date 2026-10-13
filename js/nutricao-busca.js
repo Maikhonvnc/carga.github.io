@@ -100,6 +100,7 @@ function formAlimento(pre, pronto) {
     const id = 'c' + Date.now().toString(36);
     const al = { nome, sec: 'Meus alimentos', un: 'g', m: [r1(v('na-kcal')), r1(v('na-p')), r1(v('na-c')), r1(v('na-g'))], q0: porcao || 100 };
     if (pre.codigo) al.codigo = pre.codigo;
+    if (pre.pacote) al.pacote = pre.pacote;
     if (pre.info && b === '100') al.info = pre.info; // açúcar, sódio, aditivos… (por 100 g) para a nota do produto
     dieta.custom[id] = ALIMENTOS[id] = al;
     salvarDieta();

@@ -199,15 +199,16 @@ async function novaPagina(browser, base, dados) {
   {
     const pg = await novaPagina(browser, base, { 'carga.dieta': { estoque: { ovo: 12, arroz: 100 } } });
     await pg.click('[data-tab="nutricao"]');
-    ok(await pg.locator('.nut-ref:not([data-ref="extra"])').count() === 6 && await pg.locator('[data-ref="extra"]').count() === 1, 'Hoje mostra as 6 refeições do plano e o fora do plano');
+    ok(await pg.locator('.nut-ref.hero[data-ref="cafe"]').count() === 1 && await pg.locator('[data-abrir]').count() === 5 && await pg.locator('[data-ref="extra"]').count() === 1, 'Hoje: próxima refeição em destaque, as outras 5 recolhidas e o fora do plano');
     await pg.fill('[data-ref="cafe"] input[data-i="1"]', '3');
     await pg.dispatchEvent('[data-ref="cafe"] input[data-i="1"]', 'input');
     await pg.click('[data-ref="cafe"] [data-comi]');
     const reg = await pg.evaluate(() => dieta.diario[hojeKey()].refs.cafe);
     ok(reg.itens.find(i => i.a === 'ovo').q === 3 && await pg.evaluate(() => dieta.estoque.ovo) === 9, 'Comi salva o peso digitado e tira do estoque');
-    ok((await pg.textContent('.tiles.t4 .tile')).startsWith('432'), 'calorias do dia somam o que foi comido');
+    ok(await pg.textContent('.nut-barra b') === '432' && await pg.locator('.nut-ref.hero[data-ref="colacao"]').count() === 1, 'calorias do dia somam o que foi comido e a próxima refeição vira o destaque');
     await pg.click('[data-agua="500"]');
     ok(await pg.evaluate(() => dieta.diario[hojeKey()].agua) === 500, 'conta a água');
+    await pg.click('[data-abrir="cafe"]');
     await pg.click('[data-ref="cafe"] [data-desfazer]');
     ok(await pg.evaluate(() => dieta.estoque.ovo) === 12 && !(await pg.evaluate(() => dieta.diario[hojeKey()].refs.cafe)), 'desfazer devolve ao estoque');
     // cardápio: almoço opção 3 (macarrão) na semana toda
@@ -224,7 +225,10 @@ async function novaPagina(browser, base, dados) {
     const mes = await pg.evaluate(() => Object.fromEntries(listaCompras().map(l => [l.a, l.falta])));
     ok(mes.rap10 === 60 && (await pg.textContent('#nut-corpo')).includes('60 un · 6 pacotes'), 'carrinho do mês: 30 dias, com pacotes');
     await pg.click('[data-comprei="whey"]');
-    ok(await pg.evaluate(() => dieta.estoque.whey) === 2000, 'comprei soma no estoque');
+    await pg.click('#nq-ok');
+    ok(await pg.evaluate(() => dieta.carrinho.whey.q === 2000 && !dieta.estoque.whey), 'pegou vai para o carrinho, ainda não para o estoque');
+    await pg.click('#bt-guardar');
+    ok(await pg.evaluate(() => dieta.estoque.whey) === 2000, 'guardar compras soma no estoque');
     ok(!pg.erros.length, 'sem erros de página (nutrição) ' + pg.erros.join(' | '));
   }
 
@@ -246,6 +250,7 @@ async function novaPagina(browser, base, dados) {
     // colação igual ao plano conta como seguida; repetir ontem copia o que foi comido
     await pg.click('[data-ref="colacao"] [data-comi]');
     ok((await pg.textContent('#nut-aderencia')).includes('1 de 2 refeições'), 'mostra a aderência do dia');
+    await pg.click('[data-abrir="colacao"]');
     await pg.click('[data-ref="colacao"] [data-desfazer]');
     await pg.click('[data-ref="colacao"] [data-ontem]');
     ok(await pg.inputValue('[data-ref="colacao"] input[data-i="0"]') === '40', 'repetir ontem traz o que foi comido ontem');
@@ -296,7 +301,7 @@ async function novaPagina(browser, base, dados) {
       r.fulfill({ contentType: 'application/json', body: JSON.stringify(p ? { status: 1, product: p } : { status: 0 }) });
     });
     await pg.click('[data-tab="nutricao"]');
-    await pg.click('[data-nt="produtos"]');
+    await pg.click('[data-nt="estoque"]');
     const escanear = async code => {
       await pg.click('#np-escanear');
       await pg.fill('#nc-num', code);
@@ -325,6 +330,64 @@ async function novaPagina(browser, base, dados) {
     const notas = await pg.evaluate(() => [notaProduto([159, 32, 0, 2.5], { nova: 1, acucar: 0, satur: 0.8, sodio: 60, fibra: 0 }).nota, notaProduto([480, 5, 70, 20], { acucar: 35 }).parcial]);
     ok(notas[0] >= 90 && notas[1] === true, 'nota alta para frango grelhado e aviso de nota parcial sem sódio');
     ok(!pg.erros.length, 'sem erros de página (produtos) ' + pg.erros.join(' | '));
+  }
+
+  // 11) uso no mercado e em casa: escolher pelo estoque, carrinho com quantidade real, scanner ligado ao plano, pesagem e previsão
+  {
+    const whey = { code: '7898000000001', product_name: 'Whey Concentrado', brands: 'Growth', serving_quantity: 30, product_quantity: 900, nova_group: 4,
+      additives_tags: ['en:e955'], categories_tags: [], nutriments: { 'energy-kcal_100g': 400, proteins_100g: 80, carbohydrates_100g: 8, fat_100g: 6, sugars_100g: 5, 'saturated-fat_100g': 3, sodium_100g: 0.2 } };
+    const pg = await novaPagina(browser, base, { 'carga.dieta': { estoque: { frango: 0, patinho: 2000, arroz: 1000, feijao: 1000, macarrao: 0 } } });
+    await pg.route('https://world.openfoodfacts.org/**', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify(r.request().url().includes(whey.code) ? { status: 1, product: whey } : { status: 0 }) }));
+    await pg.click('[data-tab="nutricao"]');
+    ok(await pg.locator('[data-abrir="almoco"] .tag-atencao').count() === 1, 'refeição sem ingrediente em casa aparece com "falta" na lista');
+    await pg.click('[data-abrir="almoco"]');
+    const aviso = await pg.textContent('[data-ref="almoco"] .nut-falta-aviso');
+    ok(aviso.includes('Falta filé de frango') && aviso.includes('patinho'), 'avisa o que falta e sugere o que dá pra fazer com o estoque');
+    await pg.click('[data-ref="almoco"] [data-usar]');
+    ok(await pg.evaluate(() => dieta.diario[hojeKey()].troca.almoco.esc.carne) === 'patinho' && await pg.locator('[data-ref="almoco"] .nut-falta-aviso').count() === 0, 'um toque troca pelo que tem em casa');
+    await pg.click('[data-ref="almoco"] [data-trocar]');
+    const ops = await pg.textContent('#folha');
+    ok(ops.includes('Dá pra fazer com o que tem') && ops.includes('Falta macarrão'), 'opções mostram o que dá pra fazer e o que falta');
+    await pg.evaluate(() => fecharFolha());
+    const itens = await pg.$$eval('[data-ref="almoco"] .nut-itens > *', els => els.map(e => e.className));
+    ok(itens[0].includes('pesar') && itens[itens.length - 1].includes('nut-av'), 'na pesagem o que se pesa vem primeiro e a salada fica numa linha só');
+    await pg.click('[data-ref="almoco"] [data-av]');
+    ok(await pg.locator('[data-ref="almoco"] .nut-it:not(.pesar)').count() >= 3, 'a linha da salada abre os itens');
+    // mercado
+    await pg.click('[data-nt="carrinho"]');
+    await pg.click('[data-comprei="frango"]');
+    await pg.fill('#nq-v', '1100');
+    await pg.click('#nq-ok');
+    ok(await pg.evaluate(() => dieta.carrinho.frango.q === 1100 && dieta.estoque.frango === 0) && await pg.locator('.nut-compra.pego[data-a="frango"]').count() === 1, 'marca o frango com o peso real da bandeja');
+    await pg.click('[data-comprei="frango"]');
+    await pg.click('#nq-tirar');
+    ok(await pg.evaluate(() => !dieta.carrinho.frango), 'dá para desmarcar um toque errado');
+    await pg.click('[data-comprei="frango"]');
+    await pg.fill('#nq-v', '1100');
+    await pg.click('#nq-ok');
+    await pg.click('#bt-escanear-compra');
+    await pg.fill('#nc-num', whey.code);
+    await pg.click('#nc-ok');
+    await pg.click('#na-ok');
+    await pg.click('#folha .ll-linha:has-text("Whey protein")');
+    ok(await pg.inputValue('#nq-v') === '900' && (await pg.textContent('#folha')).includes('Growth'), 'produto escaneado é ligado ao whey do plano, com o peso da embalagem e a nota');
+    await pg.click('#nq-ok');
+    ok((await pg.textContent('#nut-pegos')).startsWith('2'), 'contador do carrinho');
+    await pg.click('#bt-guardar');
+    ok(await pg.evaluate(() => dieta.estoque.frango === 1100 && dieta.estoque.whey === 900 && !Object.keys(dieta.carrinho).length && !!dieta.marcas.whey), 'guardar compras leva tudo ao estoque');
+    await pg.click('#bt-escanear-compra').catch(() => {});
+    if (await pg.isVisible('#nc-num')) {
+      await pg.fill('#nc-num', whey.code);
+      await pg.click('#nc-ok');
+      ok(await pg.isVisible('#nq-v'), 'na segunda vez o código já cai direto no whey');
+      await pg.evaluate(() => fecharFolha());
+    }
+    // despensa: previsão de quando acaba
+    await pg.click('[data-nt="estoque"]');
+    const desp = await pg.textContent('#nut-corpo');
+    ok(/porç(ão|ões) de \d+ g/.test(desp) && desp.includes('dá até') && desp.includes('Growth'), 'despensa mostra porções, até quando dá e a marca');
+    ok(await pg.locator('#nut-produtos [data-prod]').count() === 1, 'produtos ficam na despensa');
+    ok(!pg.erros.length, 'sem erros de página (mercado e casa) ' + pg.erros.join(' | '));
   }
 
   await browser.close();

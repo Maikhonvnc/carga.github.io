@@ -69,11 +69,11 @@ const dataLonga = ts => { const d = new Date(ts), s = `${DIAS[d.getDay()]}, ${d.
 const dataCurta = ts => `${DIAS[new Date(ts).getDay()].slice(0, 3)}, ${dataBr(ts)}`; // "sáb, 26/09"
 const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
 
-// folha de opções na base da tela: itens {ic, txt, valor?, sel?, acao}
+// folha de opções na base da tela: itens {ic, txt, det?, detCls?, valor?, sel?, acao}
 function abrirFolha(titulo, itens) {
   const f = $('folha');
   f.innerHTML = `<div class="folha-corpo" role="menu" aria-label="${esc(titulo)}"><div class="kicker folha-titulo">${esc(titulo)}</div>
-    ${itens.map((it, i) => `<button class="ll-linha${it.sel ? ' sel' : ''}" role="menuitem" data-i="${i}">${ic(it.ic || 'caret-right')}<span>${esc(it.txt)}</span>${it.valor ? `<span class="valor">${esc(it.valor)}</span>` : ''}</button>`).join('')}</div>`;
+    ${itens.map((it, i) => `<button class="ll-linha${it.sel ? ' sel' : ''}" role="menuitem" data-i="${i}">${ic(it.ic || 'caret-right')}<span>${esc(it.txt)}${it.det ? `<small class="ll-sub ${it.detCls || ''}">${esc(it.det)}</small>` : ''}</span>${it.valor ? `<span class="valor">${esc(it.valor)}</span>` : ''}</button>`).join('')}</div>`;
   f.hidden = false;
   f.onclick = e => { if (e.target === f) fecharFolha(); };
   f.querySelectorAll('[data-i]').forEach(b => b.onclick = () => { fecharFolha(); itens[+b.dataset.i].acao(); });
