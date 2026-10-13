@@ -282,7 +282,7 @@ const MOVIMENTOS = [
       'Suba sem travar os cotovelos com impacto',
     ],
     vars: [
-      { id: 'paralelas', nome: 'Paralelas', fe: 'Dips_-_Chest_Version', eq: 'corpo' },
+      { id: 'paralelas', nome: 'Paralelas', fe: 'Dips_-_Chest_Version', eq: 'corpo', musculos: { peito: .45, triceps: .40, ombros: .15 } },
       { id: 'paralelas_maq', nome: 'Máquina (sentado)', fe: 'Dip_Machine', eq: 'maquina', img: null },
       { id: 'paralelas_banco', nome: 'No banco', fe: 'Bench_Dips', foco: ['delt_ant'], eq: 'corpo', img: null, musculos: { triceps: .70, peito: .15, ombros: .15 },
         dica: 'Mãos no banco atrás do corpo e costas rente ao banco' },
@@ -317,7 +317,7 @@ const MOVIMENTOS = [
       { id: 'puxada_articulada', nome: 'Máquina articulada', eq: 'maquina', img: null },
     ] },
   { id: 'barra_fixa', cat: 'Costas', sub: 'Dorsais', nome: 'Barra fixa', tipo: 'composto', foco: ['dorsal'], anim: 'barrafixa', img: 'barra_fixa',
-    musculos: { costas: .60, biceps: .25, antebraco: .10, abdomen: .05 },
+    musculos: { costas: .55, biceps: .25, ombros: .10, antebraco: .05, abdomen: .05 },
     dicas: [
       'Comece pendurado com os braços estendidos e os ombros ativos',
       'Puxe levando os cotovelos em direção ao quadril',
@@ -326,11 +326,11 @@ const MOVIMENTOS = [
     ],
     vars: [
       { id: 'barra_fixa', nome: 'Pronada', fe: 'Pullups', eq: 'corpo' },
-      { id: 'barra_fixa_supinada', nome: 'Supinada', fe: 'Chin-Up', eq: 'corpo', musculos: { costas: .50, biceps: .35, antebraco: .10, abdomen: .05 } },
+      { id: 'barra_fixa_supinada', nome: 'Supinada', fe: 'Chin-Up', eq: 'corpo', musculos: { costas: .45, biceps: .35, ombros: .10, antebraco: .05, abdomen: .05 } },
       { id: 'barra_fixa_neutra', nome: 'Neutra', fe: 'V-Bar_Pullup', eq: 'corpo' },
     ] },
   { id: 'remada_curvada', cat: 'Costas', sub: 'Dorsais', nome: 'Remada curvada', tipo: 'composto', foco: ['meio_costas', 'dorsal'], anim: 'remada', img: 'remada_curvada',
-    musculos: { costas: .55, biceps: .20, trapezio: .15, lombar: .10 },
+    musculos: { costas: .50, biceps: .20, trapezio: .10, ombros: .10, lombar: .10 },
     dicas: [
       'Tronco inclinado ~45° com a coluna neutra — não arredonde as costas',
       'Joelhos levemente dobrados, quadril para trás',
@@ -343,7 +343,7 @@ const MOVIMENTOS = [
       { id: 'remada_cavalinho', nome: 'Cavalinho (T-bar)', fe: 'T-Bar_Row_with_Handle', eq: 'maquina', img: null },
     ] },
   { id: 'remada_baixa', cat: 'Costas', sub: 'Dorsais', nome: 'Remada baixa (polia)', tipo: 'composto', foco: ['meio_costas', 'dorsal'], anim: 'remada', img: 'remada_baixa',
-    musculos: { costas: .60, biceps: .25, trapezio: .15 },
+    musculos: { costas: .55, biceps: .20, trapezio: .15, ombros: .10 },
     dicas: [
       'Tronco ereto, sem balançar para trás a cada repetição',
       'Puxe com os cotovelos junto ao corpo',
@@ -356,7 +356,7 @@ const MOVIMENTOS = [
       { id: 'remada_baixa_uni', nome: 'Unilateral', uni: true, fe: 'Seated_One-arm_Cable_Pulley_Rows', eq: 'polia' },
     ] },
   { id: 'remada_maquina', cat: 'Costas', sub: 'Dorsais', nome: 'Remada máquina', tipo: 'composto', foco: ['meio_costas', 'dorsal'], anim: 'remada', img: 'remada_maquina',
-    musculos: { costas: .65, biceps: .20, trapezio: .15 },
+    musculos: { costas: .60, biceps: .15, trapezio: .15, ombros: .10 },
     dicas: [
       'Ajuste o banco para as pegadas ficarem na altura do meio do peito',
       'Peito apoiado no suporte o tempo todo',
@@ -366,10 +366,10 @@ const MOVIMENTOS = [
     vars: [
       { id: 'remada_maquina', nome: 'Articulada', eq: 'maquina' },
       { id: 'remada_maquina_neutra', nome: 'Pegada neutra', fe: 'Leverage_Iso_Row', eq: 'maquina' },
-      { id: 'remada_maquina_aberta', nome: 'Pegada aberta', fe: 'Leverage_High_Row', foco: ['meio_costas'], eq: 'maquina', musculos: { costas: .55, trapezio: .25, biceps: .20 } },
+      { id: 'remada_maquina_aberta', nome: 'Pegada aberta', fe: 'Leverage_High_Row', foco: ['meio_costas'], eq: 'maquina', musculos: { costas: .50, trapezio: .25, biceps: .15, ombros: .10 } },
     ] },
   { id: 'serrote', cat: 'Costas', sub: 'Dorsais', nome: 'Remada unilateral (serrote)', tipo: 'composto', foco: ['dorsal', 'meio_costas'], anim: 'remada', img: 'serrote',
-    musculos: { costas: .60, biceps: .20, trapezio: .10, lombar: .10 },
+    musculos: { costas: .55, biceps: .20, trapezio: .10, ombros: .10, lombar: .05 },
     dicas: [
       'Joelho e mão do mesmo lado no banco, costas paralelas ao chão',
       'Coluna neutra — não gire o tronco para puxar',
@@ -449,7 +449,7 @@ const MOVIMENTOS = [
       { id: 'elevacao_lateral_maq', nome: 'Máquina', eq: 'maquina', img: null },
     ] },
   { id: 'elevacao_frontal', cat: 'Ombros', nome: 'Elevação frontal', tipo: 'isolado', foco: ['delt_ant'], anim: 'elevacao', img: 'elevacao_frontal', faixa: [10, 15],
-    musculos: { ombros: .90, trapezio: .10 },
+    musculos: { ombros: .80, peito: .10, trapezio: .10 },
     dicas: [
       'Braços quase estendidos; suba no máximo até a altura dos olhos',
       'Tronco firme — sem jogar o corpo para trás',

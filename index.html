@@ -790,6 +790,17 @@ body.tela-cheia #toast{bottom:calc(180px + env(safe-area-inset-bottom))}
     <div id="pex-lista" style="margin-top:12px"></div>
   </div>
   <div class="card">
+    <h3><svg class="ic" aria-hidden="true"><use href="icones.svg#play"/></svg>Vídeos de execução</h3>
+    <p class="mudo">Carregue um pacote .zip (ou vários .mp4) com vídeos de exercícios. Cada vídeo vai para o exercício certo pelo nome do arquivo e fica só neste aparelho; os GIFs que você escolheu um a um não são trocados.</p>
+    <p class="mudo" id="vid-status" style="margin:8px 0 12px"></p>
+    <div class="linha">
+      <label class="btn" style="margin:0">Carregar vídeos
+        <input type="file" accept=".zip,application/zip,video/*" multiple id="input-videos" hidden>
+      </label>
+      <button class="ghost" id="bt-vid-apagar" hidden>Apagar do aparelho</button>
+    </div>
+  </div>
+  <div class="card">
     <h3><svg class="ic" aria-hidden="true"><use href="icones.svg#clock-counter-clockwise"/></svg>Backup</h3>
     <p class="mudo" style="margin-bottom:12px">Exporta treinos, dieta, anotações e perfil em JSON (fotos ficam só no aparelho).</p>
     <div class="linha">
@@ -850,6 +861,7 @@ body.tela-cheia #toast{bottom:calc(180px + env(safe-area-inset-bottom))}
 <script src="js/nutricao-busca.js"></script>
 <script src="js/nutricao-produtos.js"></script>
 <script src="js/ajustes.js"></script>
+<script src="js/videos.js"></script>
 <script src="js/main.js"></script>
 <script>
 if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');

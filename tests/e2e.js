@@ -390,6 +390,28 @@ async function novaPagina(browser, base, dados) {
     ok(!pg.erros.length, 'sem erros de página (mercado e casa) ' + pg.erros.join(' | '));
   }
 
+  // 12) vídeos de execução em pacote: ligados ao exercício pelo nome do arquivo, só no aparelho, sem trocar o GIF escolhido
+  {
+    const pg = await novaPagina(browser, base, {});
+    const mp4 = Buffer.from('00000018667479706d703432', 'hex');
+    await pg.evaluate(async () => { await idbReq((await txGifs('readwrite')).put({ ex: 'agachamento', blob: new Blob(['meu']), ts: 1 })); });
+    await pg.click('[data-tab="ajustes"]');
+    await pg.setInputFiles('#input-videos', [
+      { name: 'Barbell_Bench_Press.mp4', mimeType: 'video/mp4', buffer: mp4 },
+      { name: 'Seated_leg_extension.mp4', mimeType: 'video/mp4', buffer: mp4 },
+      { name: 'Barbell_squat.mp4', mimeType: 'video/mp4', buffer: mp4 },
+      { name: 'Jumping_Jack.mp4', mimeType: 'video/mp4', buffer: mp4 },
+    ]);
+    await pg.waitForFunction(() => /2 exercícios/.test(document.getElementById('vid-status').textContent));
+    const g = await pg.evaluate(async () => Object.fromEntries((await idbReq((await txGifs('readonly')).getAll())).map(x => [x.ex, x.origem || 'meu'])));
+    ok(g.supino_reto === 'pacote' && g.extensora === 'pacote' && g.agachamento === 'meu' && Object.keys(g).length === 3, 'vídeos do pacote vão para o exercício certo e não trocam o GIF escolhido');
+    ok(await pg.evaluate(() => variacaoDoArquivo('exercicios/Barbell_Squat.mp4') === 'agachamento' && variacaoDoArquivo('Cable_Crossover.mp4') === 'crossover'), 'reconhece também o nome do free-exercise-db');
+    await pg.click('#bt-vid-apagar');
+    await pg.waitForFunction(() => /Nenhum/.test(document.getElementById('vid-status').textContent));
+    ok(await pg.evaluate(async () => (await idbReq((await txGifs('readonly')).getAll())).map(x => x.ex).join()) === 'agachamento', 'apagar tira só os vídeos do pacote');
+    ok(!pg.erros.length, 'sem erros de página (vídeos) ' + pg.erros.join(' | '));
+  }
+
   await browser.close();
   servidor.close();
   console.log(falhas ? `\n${falhas} falha(s)` : '\nTudo certo ✔');
