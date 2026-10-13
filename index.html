@@ -518,7 +518,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 
 /* ---------- folha de opções (menu "Mais", descanso) ---------- */
 #folha{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center}
-#folha .folha-corpo{width:100%;max-width:560px;background:var(--c-card);border-radius:var(--r-card) var(--r-card) 0 0;padding:8px 8px calc(16px + env(safe-area-inset-bottom))}
+#folha .folha-corpo{width:100%;max-width:560px;max-height:88vh;overflow-y:auto;background:var(--c-card);border-radius:var(--r-card) var(--r-card) 0 0;padding:8px 8px calc(16px + env(safe-area-inset-bottom))}
 #folha .folha-titulo{padding:12px 16px 8px}
 #folha .ll-linha{border-radius:var(--r-ctl)}
 #folha .ll-linha.sel{color:var(--acao-texto);font-weight:600}
@@ -595,7 +595,65 @@ body.tela-cheia #toast{bottom:calc(180px + env(safe-area-inset-bottom))}
 .nut-camera video{width:100%;height:100%;object-fit:cover;display:block}
 .nut-mira{position:absolute;left:12%;right:12%;top:38%;bottom:38%;border:2px solid var(--acao);border-radius:8px}
 .nut-aviso{padding:10px 12px}
+.nut-resumo-prod{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tag.nut-nota{height:30px;padding:0 10px;font-size:var(--f-corpo)}
+.nut-ficha-nome{margin:0;font-size:var(--f-titulo-2)}
+.nut-lupa{display:flex;flex-wrap:wrap;gap:6px}
+.nut-lupa-it{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:var(--r-tag);background:#111;color:#fff;box-shadow:inset 0 0 0 1px var(--c-borda-forte);font-size:var(--f-apoio);font-weight:700;text-transform:uppercase;letter-spacing:.02em}
+.nut-lupa-it .ic{width:16px;height:16px;color:var(--critico)}
+.nut-ficha{display:flex;flex-direction:column}
+.nut-ficha-l{display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--c-divisor);font-size:var(--f-corpo)}
+.nut-ficha-l b{font-weight:600}
+.pill.nut-ad-atencao{background:var(--atencao-tint);color:var(--atencao)}
+.nut-ing summary{cursor:pointer;color:var(--acao-texto);font-weight:500;min-height:var(--toque-min);display:flex;align-items:center}
+.nut-ing p{font-size:var(--f-apoio);color:var(--t-2)}
+.nut-comp{width:100%;border-collapse:collapse;font-size:var(--f-apoio);table-layout:fixed}
+.nut-comp th,.nut-comp td{padding:8px 4px;border-top:1px solid var(--c-divisor);text-align:left;vertical-align:top;overflow-wrap:anywhere}
+.nut-comp thead th{color:var(--t-1);font-weight:600;border-top:0}
+.nut-comp tbody th{color:var(--t-3);font-weight:500;width:34%}
+.nut-comp td .ic{margin-left:4px;vertical-align:-2px}
+#tab-nutricao .seg button{font-size:14px}
 #tab-nutricao .seg button{padding:0 4px;min-width:0}
+#folha .folha-corpo > .ll-linha > span:nth-child(2){display:flex;flex-direction:column;gap:2px;padding:6px 0}
+.ll-sub{font-size:var(--f-legenda);color:var(--t-3);font-weight:400}
+#folha .ll-linha.sel .ll-sub.c-ok,.ll-sub.c-ok{color:var(--ok)}
+.ll-sub.c-atencao{color:var(--atencao)}
+.vira{transform:rotate(180deg)}
+.nut-cab-dir{display:flex;align-items:center;gap:4px;margin-right:-8px}
+.nut-cab-dir .tag{margin-right:8px}
+.nut-ref.hero{gap:12px}
+.nut-ref.hero .nut-cab h3{margin-top:4px}
+.nut-dia{display:flex;flex-direction:column;gap:12px}
+.nut-barras{display:grid;grid-template-columns:1fr 1fr;gap:14px 18px}
+.nut-barra{display:flex;flex-direction:column;gap:6px;min-width:0}
+.nut-barra-cab{display:flex;justify-content:space-between;gap:6px;font-size:var(--f-apoio);color:var(--t-3);white-space:nowrap}
+.nut-barra-cab b{color:var(--t-1);font-weight:600;font-size:var(--f-corpo)}
+.nut-linha .nut-hora{flex:0 0 44px;font-size:var(--f-apoio);color:var(--t-3)}
+.nut-linha.feito .ll-nome{color:var(--t-2)}
+.nut-linha .ll-nome small{font-size:var(--f-legenda);font-weight:400}
+.nut-linha .c-ok{display:flex}
+.nut-it.pesar input{flex-basis:92px;width:92px;min-height:48px;font-size:20px;font-weight:600}
+.nut-it.pesar .nome{font-weight:500}
+.nut-av{width:100%;background:none;color:var(--t-1);font-weight:400;text-align:left;border-radius:0}
+.nut-av:active{background:none}
+.nut-av .u{flex:0 0 auto;text-align:right}
+.nut-av .chev{color:var(--t-3);flex:none;margin-right:-2px}
+.nut-falta-aviso{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r-ctl);background:var(--atencao-tint);color:var(--t-1);font-size:var(--f-apoio)}
+.nut-falta-aviso > .ic{color:var(--atencao);flex:none}
+.nut-falta-aviso > span{flex:1}
+.nut-falta-aviso .btn-texto{margin:-8px -6px -8px 0;flex:none}
+.nut-mercado{display:flex;flex-direction:column;gap:12px}
+.nut-mercado h3{display:flex;align-items:center;gap:6px;margin:0}
+.nut-mercado h3 .ic{color:var(--acao-texto)}
+.nut-mercado .larga{margin-top:0}
+.nut-compra{padding-left:4px}
+.nut-check{flex:none;color:var(--t-3)}
+.nut-compra.pego .nut-check{color:var(--ok)}
+.nut-compra.pego .ll-nome{color:var(--t-2);text-decoration:line-through}
+.nut-compra.pego .nut-falta{color:var(--t-3)}
+.nut-qtd input{font-size:24px;font-weight:600;text-align:right}
+.nut-qtd .u{flex:0 0 auto;align-self:center;color:var(--t-3)}
+.nut-est .ll-nome .tag{margin-left:6px;vertical-align:1px}
 </style>
 </head>
 <body>
@@ -790,6 +848,7 @@ body.tela-cheia #toast{bottom:calc(180px + env(safe-area-inset-bottom))}
 <script src="js/maquinas.js"></script>
 <script src="js/nutricao.js"></script>
 <script src="js/nutricao-busca.js"></script>
+<script src="js/nutricao-produtos.js"></script>
 <script src="js/ajustes.js"></script>
 <script src="js/main.js"></script>
 <script>
