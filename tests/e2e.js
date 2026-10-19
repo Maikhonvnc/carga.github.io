@@ -244,6 +244,7 @@ async function novaPagina(browser, base, dados) {
     await pg.click('[data-ref="cafe"] [data-troca="0"]');
     await pg.fill('#nut-busca', 'pao de forma');
     await pg.click('#nut-resultados [data-a="pao_forma"]');
+    await pg.click('#np-ok');
     await pg.click('[data-ref="cafe"] [data-comi]');
     const cafe = await pg.evaluate(() => dieta.diario[hojeKey()].refs.cafe);
     ok(cafe.itens.map(i => i.a).join() === 'pao_forma,ovo,cafe' && cafe.fiel === false, 'troca e remove itens antes de registrar (fora do plano)');
@@ -410,6 +411,37 @@ async function novaPagina(browser, base, dados) {
     await pg.waitForFunction(() => /Nenhum/.test(document.getElementById('vid-status').textContent));
     ok(await pg.evaluate(async () => (await idbReq((await txGifs('readonly')).getAll())).map(x => x.ex).join()) === 'agachamento', 'apagar tira só os vídeos do pacote');
     ok(!pg.erros.length, 'sem erros de página (vídeos) ' + pg.erros.join(' | '));
+  }
+
+  // 13) alimentos comuns: grupo → preparo → unidade, medida caseira ou gramas; preparo tira do estoque o alimento de base
+  {
+    const pg = await novaPagina(browser, base, { 'carga.dieta': { estoque: { ovo: 12 } } });
+    await pg.click('[data-tab="nutricao"]');
+    await pg.click('[data-ref="extra"] [data-add]');
+    ok(await pg.locator('#nut-resultados [data-g]').count() >= 15, 'busca mostra os grupos de alimentos comuns');
+    await pg.click('#nut-resultados [data-g="ovo"]');
+    await pg.click('[data-prep="ovo_frito"]');
+    await pg.click('[data-med="un:2"]');
+    ok((await pg.textContent('#np-macro')).startsWith('240 kcal'), 'dois ovos fritos: 240 kcal');
+    await pg.click('#np-ok');
+    await pg.click('[data-ref="extra"] [data-add]');
+    await pg.fill('#nut-busca', 'arroz');
+    await pg.click('#nut-resultados [data-g="arroz"]');
+    await pg.click('[data-prep="arroz_integral"]');
+    await pg.click('[data-med="g:90"]');
+    await pg.click('#np-ok');
+    await pg.click('[data-ref="extra"] [data-add]');
+    await pg.click('#nut-resultados [data-g="paes"]');
+    await pg.click('[data-modo="g"]');
+    await pg.fill('#np-v', '75');
+    await pg.dispatchEvent('#np-v', 'input');
+    await pg.click('#np-ok');
+    const its = await pg.evaluate(() => dieta.diario[hojeKey()].refs.extra.itens);
+    ok(its[0].a === 'ovo_frito' && its[0].q === 2 && its[1].a === 'arroz_integral' && its[1].q === 90 && its[2].a === 'pao_frances' && its[2].q === 1.5,
+      'registra preparo e quantidade (unidades, medida caseira e gramas convertidas em unidades)');
+    ok(await pg.evaluate(() => dieta.estoque.ovo) === 10, 'ovo frito tira ovos do estoque');
+    ok(await pg.evaluate(() => seguiuPlano('cafe', { op: 0, esc: {} }, [{ a: 'pao_frances', q: 1 }, { a: 'ovo_mexido', q: 2 }, { a: 'mamao', q: 100 }, { a: 'cafe', q: 200 }])), 'ovo mexido no lugar do cozido ainda conta como seguir o plano');
+    ok(!pg.erros.length, 'sem erros de página (alimentos comuns) ' + pg.erros.join(' | '));
   }
 
   await browser.close();

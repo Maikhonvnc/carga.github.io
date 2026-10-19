@@ -33,16 +33,24 @@ function abrirBusca(titulo, escolher) {
     </div>
     <div class="nut-resultados" id="nut-resultados"></div>`);
   const pega = item => { fecharPainel(); escolher(item); };
+  const porcao = a => abrirPorcao(a, escolher);
+  const linhaAl = a => `<button class="ll-linha" data-a="${a}"><span>${esc(ALIMENTOS[a].nome)}</span>
+    <span class="valor">${kcal(macros([novoItem(a)])[0])} kcal · ${qtdTxt(a, qPadrao(a))}</span></button>`;
+  const grupos = gs => `<div class="nut-grupos">${gs.map(g => `<button class="chip" data-g="${g.id}">${esc(g.nome)}</button>`).join('')}</div>`;
   const lista = () => {
-    const q = semAcento($('nut-busca').value.trim());
-    const todos = Object.keys(ALIMENTOS);
-    const ids = q ? todos.filter(a => semAcento(ALIMENTOS[a].nome).includes(q))
-      : [...dieta.recentes.filter(a => ALIMENTOS[a]), ...todos.filter(a => !dieta.recentes.includes(a))];
-    $('nut-resultados').innerHTML = (!q && dieta.recentes.length ? '<div class="kicker">Recentes primeiro</div>' : '') +
-      (ids.length ? ids.slice(0, 40).map(a => `<button class="ll-linha" data-a="${a}"><span>${esc(ALIMENTOS[a].nome)}</span>
-        <span class="valor">${kcal(macros([novoItem(a)])[0])} kcal · ${qtdTxt(a, qPadrao(a))}</span></button>`).join('')
-        : `<p class="mudo">Nada com "${esc($('nut-busca').value)}". Cadastre como alimento novo.</p>`);
-    $('nut-resultados').querySelectorAll('[data-a]').forEach(b => b.onclick = () => pega(novoItem(b.dataset.a)));
+    const q = semAcento($('nut-busca').value.trim()), res = $('nut-resultados');
+    if (!q) {
+      const rec = dieta.recentes.filter(a => ALIMENTOS[a]).slice(0, 8);
+      res.innerHTML = (rec.length ? `<div class="kicker">Recentes</div>${rec.map(linhaAl).join('')}` : '') +
+        `<div class="kicker">Alimentos comuns</div>${grupos(COMUNS)}<p class="mudo">Escolha o alimento, o preparo e a quantidade (unidade, medida caseira ou gramas).</p>`;
+    } else {
+      const gs = COMUNS.filter(g => semAcento(g.nome).includes(q));
+      const ids = Object.keys(ALIMENTOS).filter(a => semAcento(ALIMENTOS[a].nome).includes(q) || (comumMap[a] && semAcento(`${comumMap[a].g.nome} ${comumMap[a].preparo}`).includes(q)));
+      res.innerHTML = (gs.length ? grupos(gs) : '') + (ids.length ? ids.slice(0, 40).map(linhaAl).join('')
+        : gs.length ? '' : `<p class="mudo">Nada com "${esc($('nut-busca').value)}". Cadastre como alimento novo.</p>`);
+    }
+    res.querySelectorAll('[data-a]').forEach(b => b.onclick = () => porcao(b.dataset.a));
+    res.querySelectorAll('[data-g]').forEach(b => b.onclick = () => porcao(COMUNS.find(g => g.id === b.dataset.g).itens[0][0]));
   };
   $('nut-busca').oninput = lista;
   lista();
@@ -50,6 +58,48 @@ function abrirBusca(titulo, escolher) {
   $('nb-kcal').onclick = () => formCalorias(pega);
   $('nb-codigo').onclick = () => scannerCodigo(a => pega(novoItem(a)));
   $('nb-foto').onclick = () => fotoTabela(a => pega(novoItem(a)));
+}
+
+// ---------- porção: preparo + quantidade (unidade, medida caseira ou gramas) ----------
+function abrirPorcao(a0, escolher) {
+  const cm = comumMap[a0], g = cm && cm.g;
+  let a = a0, al = ALIMENTOS[a], modo = al.un === 'un' ? 'un' : 'g', v = qPadrao(a);
+  const desenha = () => {
+    al = ALIMENTOS[a];
+    const uG = al.un === 'ml' ? 'ml' : 'g', medidas = [...(al.un === 'un' ? [1, 2, 3].map(n => [`${n} ${n === 1 ? 'unidade' : 'unidades'}`, n * al.gUn, 'un', n]) : []),
+      ...((g && g.medidas) || []).map(([t, gr]) => [t, gr, 'g', gr])];
+    const q = modo === 'un' ? v : al.un === 'un' ? v / al.gUn : v, it = { a, q };
+    abrirPainel(`<div class="kicker folha-titulo">${esc(g ? g.nome : 'Quantidade')}</div>
+      ${g && g.itens.length > 1 ? `<div class="chips nut-preparos" role="radiogroup" aria-label="Preparo">${g.itens.map(([id, prep]) =>
+        `<button class="chip" role="radio" aria-checked="${id === a}" data-prep="${id}">${esc(prep)}</button>`).join('')}</div>` : `<h3 class="nut-ficha-nome">${esc(al.nome)}</h3>`}
+      ${al.un === 'un' && al.gUn ? `<div class="seg" id="np-modo" style="background:var(--c-elev)">
+        <button data-modo="un" class="${modo === 'un' ? 'ativo' : ''}">${esc(al.nu ? al.nu[0].toUpperCase() + al.nu.slice(1) : 'Unidades')}</button>
+        <button data-modo="g" class="${modo === 'g' ? 'ativo' : ''}">Gramas</button></div>` : ''}
+      <div class="linha nut-qtd"><input id="np-v" type="number" inputmode="decimal" min="0" step="any" class="num" value="${+(+v).toFixed(1)}" aria-label="Quantidade">
+        <span class="u">${modo === 'un' ? unTxt(a) : uG}</span></div>
+      ${medidas.length ? `<div class="chips">${medidas.map(([t, gr, m, val]) => `<button class="chip" data-med="${m}:${val}">${esc(t)}${m === 'g' ? ` · ${gr} ${uG}` : ''}</button>`).join('')}</div>` : ''}
+      <div class="nut-macro" id="np-macro">${macroLinha(macros([it]))}</div>
+      <button class="larga" id="np-ok">${ic('plus')}Adicionar</button>`);
+    const inp = $('np-v');
+    inp.oninput = () => { v = parseFloat(inp.value.replace(',', '.')) || 0; $('np-macro').textContent = macroLinha(macros([{ a, q: modo === 'un' ? v : al.un === 'un' ? v / al.gUn : v }])); };
+    $('folha').querySelectorAll('[data-prep]').forEach(b => b.onclick = () => {
+      const gramas = modo === 'un' ? v * al.gUn : v, novo = ALIMENTOS[b.dataset.prep];
+      a = b.dataset.prep;
+      if (modo === 'un' && novo.un !== 'un') { modo = 'g'; v = gramas; }
+      desenha();
+    });
+    $('folha').querySelectorAll('[data-modo]').forEach(b => b.onclick = () => {
+      if (b.dataset.modo === modo) return;
+      v = modo === 'un' ? Math.round(v * al.gUn) : Math.round(v / al.gUn * 10) / 10; modo = b.dataset.modo; desenha();
+    });
+    $('folha').querySelectorAll('[data-med]').forEach(b => b.onclick = () => { const [m, val] = b.dataset.med.split(':'); modo = m; v = +val; desenha(); });
+    $('np-ok').onclick = () => {
+      if (!(v > 0)) return toast('Coloque a quantidade');
+      const q = modo === 'un' || al.un !== 'un' ? v : Math.round(v / al.gUn * 100) / 100;
+      fecharPainel(); escolher({ a, q });
+    };
+  };
+  desenha();
 }
 
 // ---------- só calorias ----------
