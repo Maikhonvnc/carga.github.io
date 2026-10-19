@@ -53,6 +53,7 @@ const kcal = v => Math.round(v).toLocaleString('pt-BR');
 // quanto se compra por unidade comida (cozido → cru, casca, pó de café)
 function fator(a) {
   const al = ALIMENTOS[a];
+  if (al.base) return fator(al.base); // ovo frito, macarrão ao molho… compram-se como o alimento de base
   return dieta.fatores[a] ?? (al.sec === 'Carnes' ? dieta.fatores.carnes : undefined) ?? al.f ?? 1;
 }
 const compra = (a, q) => q * fator(a);
@@ -188,7 +189,8 @@ const ontemKey = () => dayKey(new Date(hojeKey() + 'T12:00').getTime() - 864e5);
 function seguiuPlano(ref, cel, itens) {
   const plano = itensDe(ref, cel).filter(i => !i.av), comidos = itens.filter(i => !i.k && !(ALIMENTOS[i.a] && ALIMENTOS[i.a].av));
   if (plano.length !== comidos.length) return false;
-  return plano.every(p => comidos.some(c => c.a === p.a && Math.abs(c.q - p.q) <= p.q * 0.25));
+  const raiz = a => (ALIMENTOS[a] && ALIMENTOS[a].base) || a; // ovo mexido no lugar do ovo cozido ainda é o plano
+  return plano.every(p => comidos.some(c => raiz(c.a) === raiz(p.a) && Math.abs(c.q - p.q) <= p.q * 0.25));
 }
 // aderência: refeições do plano registradas que seguiram a dieta (refeição livre conta como seguida)
 function aderencia(keys) {
@@ -261,8 +263,8 @@ function linhaRefeicao(key, r, reg) {
   const det = reg ? (reg.livre ? 'Refeição livre' : `Comido ${dataHora(reg.ts)} · ${kcal(macros(reg.itens)[0])} kcal`)
     : `${r.ops.length > 1 ? `${cel.op + 1}. ` : ''}${r.ops[cel.op].nome} · ${kcal(macros(rascunho(key, r.id))[0])} kcal`;
   return `<button class="linha-lista nut-linha${reg ? ' feito' : ''}" data-abrir="${r.id}">
-    <span class="nut-hora num">${/^\d/.test(r.hora) ? esc(r.hora) : ''}</span>
-    <span class="ll-txt"><span class="ll-nome">${esc(r.nome)}${/^\d/.test(r.hora) ? '' : ` <small class="c-3">${esc(r.hora)}</small>`}</span><span class="ll-det">${esc(det)}</span></span>
+    <span class="nut-hora num">${/^\d+:\d+$/.test(r.hora) ? esc(r.hora) : ''}</span>
+    <span class="ll-txt"><span class="ll-nome">${esc(r.nome)}${/^\d+:\d+$/.test(r.hora) ? '' : ` <small class="c-3">${esc(r.hora)}</small>`}</span><span class="ll-det">${esc(det)}</span></span>
     ${reg ? `<span class="c-ok">${ic(reg.fiel || reg.livre ? 'check-circle-fill' : 'check')}</span>` : falta ? `<span class="tag tag-atencao">${ic('package')}falta</span>` : ''}${ic('caret-down', 'chev')}</button>`;
 }
 
@@ -396,8 +398,8 @@ function ligaRefeicao(card, key, r, el) {
 function baixaEstoque(itens, baixa = {}) {
   for (const { a, q, k } of itens) {
     if (k || !ALIMENTOS[a]) continue;
-    const tem = dieta.estoque[a] || 0, sai = Math.min(tem, compra(a, q));
-    if (sai > 0) { dieta.estoque[a] = tem - sai; baixa[a] = (baixa[a] || 0) + sai; }
+    const s = ALIMENTOS[a].base || a, tem = dieta.estoque[s] || 0, sai = Math.min(tem, compra(a, q));
+    if (sai > 0) { dieta.estoque[s] = tem - sai; baixa[s] = (baixa[s] || 0) + sai; }
   }
   return baixa;
 }
@@ -593,7 +595,7 @@ function ligarProduto(id, preferidos, pronto) {
   const al = ALIMENTOS[id];
   if (al.sec !== 'Meus alimentos') return pronto(id); // já é um alimento da dieta
   if (al.liga && ALIMENTOS[al.liga]) return pronto(al.liga);
-  const daDieta = Object.keys(ALIMENTOS).filter(a => ALIMENTOS[a].sec !== 'Meus alimentos');
+  const daDieta = Object.keys(ALIMENTOS).filter(a => ALIMENTOS[a].sec !== 'Meus alimentos' && !ALIMENTOS[a].comum);
   const ordem = [...preferidos.filter(a => daDieta.includes(a)), ...daDieta.filter(a => !preferidos.includes(a))];
   const liga = a => { al.liga = a; if (dieta.custom[id]) dieta.custom[id].liga = a; salvarDieta(); pronto(a); };
   abrirFolha(`${al.nome}: é qual item?`, [
