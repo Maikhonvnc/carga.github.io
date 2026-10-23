@@ -1,9 +1,9 @@
 /* Carga — Vídeos de execução em pacote: um .zip (ou vários .mp4) que você carrega no aparelho.
    Cada vídeo é ligado ao exercício pelo nome do arquivo e fica só no IndexedDB deste aparelho, como o "Adicionar GIF".
+   O .zip é lido aqui mesmo, sem baixar nada (funciona offline).
    Nada disso vai para o site: aqui só há a tabela de nomes. */
 'use strict';
 
-const CDN_FFLATE = 'https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js';
 const chaveVideo = s => s.split('/').pop().replace(/\.(mp4|webm|mov|gif)$/i, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 // nome do arquivo (pacote do BeFit, em inglês) → variação do Carga
 const VIDEOS_PACOTE = {
@@ -67,27 +67,63 @@ async function gravarVideos(arqs) {
   return { ligados: novos.length, sem: sem.length };
 }
 
+// leitor de .zip sem biblioteca: lê o índice no fim do arquivo e descompacta só os vídeos que interessam,
+// um por vez, com o DecompressionStream do navegador (o arquivo nunca é carregado inteiro na memória)
+async function lerZip(file, quer, aoAvancar = () => {}) {
+  const u8 = async (ini, fim) => new Uint8Array(await file.slice(ini, fim).arrayBuffer());
+  const fimTam = Math.min(file.size, 65557), fim = await u8(file.size - fimTam, file.size), dvF = new DataView(fim.buffer);
+  let e = -1;
+  for (let i = fim.length - 22; i >= 0; i--) if (dvF.getUint32(i, true) === 0x06054b50) { e = i; break; }
+  if (e < 0) throw new Error('não parece um arquivo .zip');
+  const tamIdx = dvF.getUint32(e + 12, true), iniIdx = dvF.getUint32(e + 16, true);
+  if (iniIdx === 0xffffffff) throw new Error('.zip grande demais (zip64)');
+  const idx = await u8(iniIdx, iniIdx + tamIdx), dv = new DataView(idx.buffer), nomes = new TextDecoder();
+  const ents = [];
+  for (let p = 0; p + 46 <= idx.length && dv.getUint32(p, true) === 0x02014b50;) {
+    const metodo = dv.getUint16(p + 10, true), tamC = dv.getUint32(p + 20, true), n = dv.getUint16(p + 28, true);
+    const x = dv.getUint16(p + 30, true), c = dv.getUint16(p + 32, true), local = dv.getUint32(p + 42, true);
+    const nome = nomes.decode(idx.subarray(p + 46, p + 46 + n));
+    if (quer(nome)) ents.push({ nome, metodo, tamC, local });
+    p += 46 + n + x + c;
+  }
+  const saida = [];
+  for (const [i, en] of ents.entries()) {
+    aoAvancar(i + 1, ents.length);
+    const h = new DataView((await u8(en.local, en.local + 30)).buffer);
+    const ini = en.local + 30 + h.getUint16(26, true) + h.getUint16(28, true), bruto = file.slice(ini, ini + en.tamC);
+    let blob;
+    if (en.metodo === 0) blob = bruto;
+    else if (en.metodo === 8) blob = await new Response(bruto.stream().pipeThrough(new DecompressionStream('deflate-raw'))).blob();
+    else continue;
+    saida.push({ nome: en.nome, dados: new Blob([blob], { type: tipoVideo(en.nome) }) });
+  }
+  return saida;
+}
+const ehZip = async f => /\.zip$/i.test(f.name) || new TextDecoder().decode(new Uint8Array(await f.slice(0, 2).arrayBuffer())) === 'PK';
+
 async function importarVideos(input) {
   const files = [...(input.files || [])];
   input.value = '';
   if (!files.length) return;
   const st = $('vid-status');
   st.textContent = 'Lendo os vídeos…';
+  let erro = '';
   try {
     const arqs = [];
     for (const f of files) {
-      if (!/\.zip$/i.test(f.name)) { arqs.push({ nome: f.name, dados: f }); continue; }
-      const { unzipSync } = await import(CDN_FFLATE);
-      // só descompacta os vídeos que têm exercício correspondente
-      const zip = unzipSync(new Uint8Array(await f.arrayBuffer()), { filter: z => /\.(mp4|webm|mov|gif)$/i.test(z.name) && !!variacaoDoArquivo(z.name) });
-      for (const [nome, dados] of Object.entries(zip)) arqs.push({ nome, dados });
+      if (!(await ehZip(f))) { arqs.push({ nome: f.name, dados: f }); continue; }
+      if (typeof DecompressionStream === 'undefined') throw new Error('este navegador não abre .zip; atualize o Chrome ou escolha os vídeos soltos');
+      arqs.push(...await lerZip(f, nome => /\.(mp4|webm|mov|gif)$/i.test(nome) && !!variacaoDoArquivo(nome),
+        (i, n) => { st.textContent = `Lendo o vídeo ${i} de ${n}…`; }));
     }
     const r = await gravarVideos(arqs);
     toast(r.ligados ? `${plural(r.ligados, 'vídeo ligado', 'vídeos ligados')} aos exercícios` : 'Nenhum vídeo novo para os exercícios do Carga');
-  } catch {
-    toast('Não deu para ler o arquivo. Tente de novo com internet (o leitor de .zip é baixado na hora).');
+  } catch (err) {
+    erro = `Não deu para ler o arquivo: ${err && err.message ? err.message : 'erro desconhecido'}.`;
+    toast(erro);
   }
-  renderVideos();
+  await renderVideos();
+  if (erro) st.textContent = erro;
 }
 
 async function renderVideos() {
