@@ -406,6 +406,21 @@ async function novaPagina(browser, base, dados) {
     await pg.waitForFunction(() => /2 exercícios/.test(document.getElementById('vid-status').textContent));
     const g = await pg.evaluate(async () => Object.fromEntries((await idbReq((await txGifs('readonly')).getAll())).map(x => [x.ex, x.origem || 'meu'])));
     ok(g.supino_reto === 'pacote' && g.extensora === 'pacote' && g.agachamento === 'meu' && Object.keys(g).length === 3, 'vídeos do pacote vão para o exercício certo e não trocam o GIF escolhido');
+    // .zip (deflate) lido no próprio navegador, sem biblioteca: só os vídeos com exercício entram
+    const zlib = require('zlib'), partes = [], idx = [];
+    let pos = 0;
+    for (const [nome, dados, comprime] of [['videos/Seated_leg_curl_machine.mp4', mp4, true], ['videos/Calf_raises.mp4', mp4, false], ['svgs/logo.svg', Buffer.from('<svg/>'), true]]) {
+      const n = Buffer.from(nome), c = comprime ? zlib.deflateRawSync(dados) : dados, h = Buffer.alloc(30), e = Buffer.alloc(46);
+      h.writeUInt32LE(0x04034b50, 0); h.writeUInt16LE(comprime ? 8 : 0, 8); h.writeUInt32LE(c.length, 18); h.writeUInt32LE(dados.length, 22); h.writeUInt16LE(n.length, 26);
+      e.writeUInt32LE(0x02014b50, 0); e.writeUInt16LE(comprime ? 8 : 0, 10); e.writeUInt32LE(c.length, 20); e.writeUInt32LE(dados.length, 24); e.writeUInt16LE(n.length, 28); e.writeUInt32LE(pos, 42);
+      partes.push(h, n, c); idx.push(e, n); pos += 30 + n.length + c.length;
+    }
+    const cd = Buffer.concat(idx), fimZip = Buffer.alloc(22);
+    fimZip.writeUInt32LE(0x06054b50, 0); fimZip.writeUInt16LE(3, 8); fimZip.writeUInt16LE(3, 10); fimZip.writeUInt32LE(cd.length, 12); fimZip.writeUInt32LE(pos, 16);
+    await pg.setInputFiles('#input-videos', { name: 'pacote', mimeType: 'application/octet-stream', buffer: Buffer.concat([...partes, cd, fimZip]) });
+    await pg.waitForFunction(() => /4 exercícios/.test(document.getElementById('vid-status').textContent));
+    const doZip = await pg.evaluate(async () => { const g = await idbReq((await txGifs('readonly')).get('flexora_sentada')); return g && [g.blob.size, g.blob.type]; });
+    ok(doZip && doZip[0] === 12 && doZip[1] === 'video/mp4', 'lê o .zip no aparelho (mesmo sem extensão no nome) e descompacta os vídeos');
     ok(await pg.evaluate(() => variacaoDoArquivo('exercicios/Barbell_Squat.mp4') === 'agachamento' && variacaoDoArquivo('Cable_Crossover.mp4') === 'crossover'), 'reconhece também o nome do free-exercise-db');
     await pg.click('#bt-vid-apagar');
     await pg.waitForFunction(() => /Nenhum/.test(document.getElementById('vid-status').textContent));
