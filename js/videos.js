@@ -74,7 +74,7 @@ async function lerZip(file, quer, aoAvancar = () => {}) {
   const fimTam = Math.min(file.size, 65557), fim = await u8(file.size - fimTam, file.size), dvF = new DataView(fim.buffer);
   let e = -1;
   for (let i = fim.length - 22; i >= 0; i--) if (dvF.getUint32(i, true) === 0x06054b50) { e = i; break; }
-  if (e < 0) throw new Error('não parece um arquivo .zip');
+  if (e < 0) return lerZipSeguido(file, quer, aoAvancar);
   const tamIdx = dvF.getUint32(e + 12, true), iniIdx = dvF.getUint32(e + 16, true);
   if (iniIdx === 0xffffffff) throw new Error('.zip grande demais (zip64)');
   const idx = await u8(iniIdx, iniIdx + tamIdx), dv = new DataView(idx.buffer), nomes = new TextDecoder();
@@ -98,6 +98,46 @@ async function lerZip(file, quer, aoAvancar = () => {}) {
     saida.push({ nome: en.nome, dados: new Blob([blob], { type: tipoVideo(en.nome) }) });
   }
   return saida;
+}
+// sem o índice do fim (download cortado ou zip estranho): segue os cabeçalhos do começo, entrada por entrada
+async function lerZipSeguido(file, quer, aoAvancar) {
+  const u8 = async (ini, fim) => new Uint8Array(await file.slice(ini, fim).arrayBuffer());
+  const ini0 = await u8(0, 64), dv0 = new DataView(ini0.buffer);
+  if (ini0.length < 4 || dv0.getUint32(0, true) !== 0x04034b50) throw new Error(motivoNaoZip(file, ini0));
+  const ents = [];
+  for (let p = 0; p + 30 <= file.size;) {
+    const h = await u8(p, p + 30), dv = new DataView(h.buffer);
+    if (dv.getUint32(0, true) !== 0x04034b50) break;
+    const flags = dv.getUint16(6, true), metodo = dv.getUint16(8, true), tamC = dv.getUint32(18, true);
+    const n = dv.getUint16(26, true), x = dv.getUint16(28, true), dados = p + 30 + n + x;
+    if (flags & 8 || dados + tamC > file.size) break;
+    const nome = new TextDecoder().decode(await u8(p + 30, p + 30 + n));
+    if (quer(nome)) ents.push({ nome, metodo, dados, tamC });
+    p = dados + tamC;
+  }
+  const saida = [];
+  for (const [i, en] of ents.entries()) {
+    aoAvancar(i + 1, ents.length);
+    const bruto = file.slice(en.dados, en.dados + en.tamC);
+    let blob;
+    if (en.metodo === 0) blob = bruto;
+    else if (en.metodo === 8) blob = await new Response(bruto.stream().pipeThrough(new DecompressionStream('deflate-raw'))).blob();
+    else continue;
+    saida.push({ nome: en.nome, dados: new Blob([blob], { type: tipoVideo(en.nome) }) });
+  }
+  if (!saida.length) throw new Error(`o .zip parece incompleto (${tamTxt(file.size)}; o do BeFit tem uns 47 MB). Baixe de novo ou extraia e escolha os .mp4`);
+  return saida;
+}
+const tamTxt = n => n >= 1e6 ? `${(n / 1e6).toFixed(1).replace('.', ',')} MB` : `${Math.round(n / 1e3)} KB`;
+// diz o que o arquivo é de fato, pra saber se foi o download que veio errado
+function motivoNaoZip(file, ini) {
+  const txt = new TextDecoder().decode(ini).trimStart().toLowerCase();
+  const nome = `"${file.name}" (${tamTxt(file.size)})`;
+  if (!file.size) return `${nome} está vazio. Talvez o download não terminou; baixe de novo`;
+  if (txt.startsWith('<!doctype') || txt.startsWith('<html') || txt.startsWith('<')) return `${nome} é uma página da web, não o .zip. Abra o link de download e baixe o arquivo em si`;
+  if (txt.startsWith('{')) return `${nome} é um texto de erro do servidor, não o .zip. Baixe de novo`;
+  if (ini[4] === 0x66 && ini[5] === 0x74 && ini[6] === 0x79 && ini[7] === 0x70) return `${nome} é um vídeo, não um .zip. Escolha os vídeos junto, sem o zip, que também funciona`;
+  return `${nome} não é um .zip. Se o celular já extraiu, escolha os vídeos .mp4 de dentro da pasta`;
 }
 const ehZip = async f => /\.zip$/i.test(f.name) || new TextDecoder().decode(new Uint8Array(await f.slice(0, 2).arrayBuffer())) === 'PK';
 

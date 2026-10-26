@@ -425,6 +425,13 @@ async function novaPagina(browser, base, dados) {
     await pg.click('#bt-vid-apagar');
     await pg.waitForFunction(() => /Nenhum/.test(document.getElementById('vid-status').textContent));
     ok(await pg.evaluate(async () => (await idbReq((await txGifs('readonly')).getAll())).map(x => x.ex).join()) === 'agachamento', 'apagar tira só os vídeos do pacote');
+    // download cortado (sem o índice no fim) ainda lê o que veio; página da web com nome .zip explica o que é
+    await pg.setInputFiles('#input-videos', { name: 'Befit_extraido.zip', mimeType: 'application/zip', buffer: Buffer.concat(partes) });
+    await pg.waitForFunction(() => /2 exercícios/.test(document.getElementById('vid-status').textContent));
+    ok(true, 'lê o .zip cortado seguindo as entradas do começo');
+    await pg.setInputFiles('#input-videos', { name: 'Befit_extraido.zip', mimeType: 'application/zip', buffer: Buffer.from('<!DOCTYPE html><html><body>Drive</body></html>') });
+    await pg.waitForFunction(() => /página da web/.test(document.getElementById('vid-status').textContent));
+    ok((await pg.textContent('#vid-status')).includes('Befit_extraido.zip'), 'diz que o "zip" é uma página da web, com nome e tamanho');
     ok(!pg.erros.length, 'sem erros de página (vídeos) ' + pg.erros.join(' | '));
   }
 
