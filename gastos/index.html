@@ -340,7 +340,7 @@ function salvarCats(){
   dCat.close();salvar();
 }
 function delCat(i){const c=db.cats[i];if(db.movs.some(m=>m.cat===c.nome)&&!confirm(`"${c.nome}" tem gastos lançados. Remover mesmo assim? (os gastos continuam)`))return;db.cats.splice(i,1);abrirCategorias()}
-function baixar(nome,conteudo,tipo){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([conteudo],{type:tipo}));a.download=nome;a.click()}
+function baixar(nome,conteudo,tipo){if(window.Android)return Android.compartilhar(nome,conteudo);const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([conteudo],{type:tipo}));a.download=nome;a.click()}
 function exportar(){baixar(`gastos-backup-${hoje()}.json`,JSON.stringify(db,null,1),'application/json')}
 function exportarCSV(){
   const linhas=[['Data','Tipo','Categoria','Descrição','Valor']].concat(db.movs.map(m=>[m.data,m.tipo==='in'?'Entrada':'Saída',m.cat||'',m.desc,(m.tipo==='out'?-m.valor:m.valor).toFixed(2).replace('.',',')]));
