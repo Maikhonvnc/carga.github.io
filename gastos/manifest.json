@@ -1,1 +1,14 @@
-{"name":"Meus Gastos","short_name":"Gastos","start_url":"./","scope":"./","display":"standalone","background_color":"#0f766e","theme_color":"#0f766e","icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml"}]}
+{
+  "name": "Meus Gastos",
+  "short_name": "Gastos",
+  "description": "Controle de gastos pessoais: saldo, salário, contas fixas e categorias.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0d0d0d",
+  "theme_color": "#0d0d0d",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

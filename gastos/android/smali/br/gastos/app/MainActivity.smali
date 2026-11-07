@@ -17,6 +17,8 @@
     new-instance v0, Landroid/webkit/WebView;
     invoke-direct {v0, p0}, Landroid/webkit/WebView;-><init>(Landroid/content/Context;)V
     iput-object v0, p0, Lbr/gastos/app/MainActivity;->w:Landroid/webkit/WebView;
+    const v1, -0xf2f2f3
+    invoke-virtual {v0, v1}, Landroid/webkit/WebView;->setBackgroundColor(I)V
     invoke-virtual {v0}, Landroid/webkit/WebView;->getSettings()Landroid/webkit/WebSettings;
     move-result-object v1
     const/4 v2, 0x1
