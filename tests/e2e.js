@@ -435,6 +435,24 @@ async function novaPagina(browser, base, dados) {
     ok(!pg.erros.length, 'sem erros de página (vídeos) ' + pg.erros.join(' | '));
   }
 
+  // 12b) equipamento: filtro no Core separa sem equipamento / barra e acessórios / máquina e lembra a escolha
+  {
+    const pg = await novaPagina(browser, base, {});
+    await pg.click('[data-grupo="Core"]');
+    await pg.click('[data-eq="acessorios"]');
+    const movsAc = await pg.$$eval('.mov', e => e.map(x => x.dataset.mov));
+    ok(movsAc.includes('elevacao_pernas') && !movsAc.includes('prancha'), 'filtro "Barra e acessórios" esconde o que não usa aparelho');
+    await pg.click('[data-mov="elevacao_pernas"]');
+    ok(await pg.evaluate(() => ativo.ex === 'elevacao_pernas_barra' && /barra fixa/.test(document.querySelector('.p-eq').textContent)), 'abre a variação na barra e mostra o aparelho');
+    ok(await pg.evaluate(() => exMap.elevacao_pernas_barra.corpo && tipoEq(exMap.abdominal) === 'livre' && tipoEq(exMap.abdominal_polia) === 'maquina' && tipoEq(exMap.barra_fixa) === 'acessorios'), 'na barra continua peso corporal; crunch é sem equipamento, polia é máquina');
+    await pg.click('#bt-voltar');
+    ok(await pg.getAttribute('[data-eq="acessorios"]', 'aria-checked') === 'true', 'filtro lembrado ao voltar');
+    await pg.click('[data-eq="maquina"]');
+    ok((await pg.$$eval('.mov', e => e.map(x => x.dataset.mov))).join() === 'abdominal,estabilidade_core', 'filtro "Máquina" mostra só máquina e polia');
+    ok(await pg.evaluate(() => Object.values(VIDEOS_PACOTE).every(id => exMap[id])), 'todo vídeo do pacote aponta para uma variação existente');
+    ok(!pg.erros.length, 'sem erros de página (equipamento) ' + pg.erros.join(' | '));
+  }
+
   // 13) alimentos comuns: grupo → preparo → unidade, medida caseira ou gramas; preparo tira do estoque o alimento de base
   {
     const pg = await novaPagina(browser, base, { 'carga.dieta': { estoque: { ovo: 12 } } });
