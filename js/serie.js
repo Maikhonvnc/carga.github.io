@@ -22,7 +22,7 @@ function renderCtl() {
 
 // próximo exercício da rotina/treino em andamento que ainda não foi feito hoje
 function proximoDaRotina() {
-  const rot = rotinaAtiva();
+  const rot = rotinaAtiva() || rotinaDoDia();
   if (!rot) return null;
   const feitos = new Set(logs.filter(l => dayKey(l.ts) === hojeKey()).map(l => l.ex));
   return rot.itens.find(id => exMap[id] && !feitos.has(id) && id !== ativo.ex) || null;

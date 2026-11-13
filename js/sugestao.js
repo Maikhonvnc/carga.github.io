@@ -9,11 +9,28 @@ const TREINOS = [
   { id: 'puxar', nome: 'Puxar', det: 'Costas · Bíceps', curto: 'Costas · Bíceps', principais: ['costas', 'biceps'] },
   { id: 'pernas', nome: 'Pernas', det: 'Coxas · Glúteos · Panturrilha', curto: 'Coxas · Glúteos', principais: ['quadriceps', 'posteriores', 'gluteos', 'panturrilha'] },
 ].map(t => ({ ...t, musculos: REGIOES.find(r => r.id === t.id).musculos }));
-// grupo da tela inicial que pertence ao treino (a maioria dos músculos do grupo nele)
-const grupoNoTreino = (g, t) => g.musculos.length > 0 && g.musculos.filter(m => t.musculos.includes(m)).length / g.musculos.length >= 0.6;
+const CORE = REGIOES.find(r => r.id === 'core').musculos; // fora do rodízio: entra em qualquer treino
+// grupo da tela inicial que tem algum músculo principal do treino (Braços entra em Empurrar pelo tríceps e em Puxar pelo bíceps)
+const grupoNoTreino = (g, t) => g.musculos.some(m => t.principais.includes(m));
+// músculo que mais trabalha no exercício
+const musculoDe = e => Object.keys(e.musculos || {}).reduce((a, m) => (!a || e.musculos[m] > e.musculos[a] ? m : a), null);
+// exercício que cabe no treino: o músculo principal é do treino (ou do core). Tríceps não é de Puxar.
+const exNoTreino = (e, t) => { const m = musculoDe(e); return !m || t.musculos.includes(m) || CORE.includes(m); };
 // treino que a tela inicial está mostrando no card do dia (null = descanso ou primeiro uso)
 let treinoDoCard = null;
-let treinoEscolha = null; // treino que o usuário escolheu no lugar do sugerido (vale até recarregar)
+let treinoEscolha = null; // treino que o usuário tocou para ver no lugar do sugerido (vale até recarregar)
+
+// treino do dia: fica escolhido do momento em que começa até o dia acabar (sobrevive a recarregar e a voltar para o início)
+const LS_TREINO_DIA = 'carga.treinoDia';
+function treinoFixo() {
+  const d = lerLS(LS_TREINO_DIA, null);
+  return d && d.dia === hojeKey() ? TREINOS.find(t => t.id === d.id) || null : null;
+}
+function fixaTreino(t) {
+  if (t) localStorage.setItem(LS_TREINO_DIA, JSON.stringify({ dia: hojeKey(), id: t.id }));
+}
+// treino de hoje para quem está fora da tela inicial (lista do grupo, próximo exercício)
+const treinoDeHoje = () => treinoFixo() || treinoDoCard;
 
 // treino de um dia: o que mais recebeu séries (cada série pesa a fração do músculo no exercício); só core = nenhum
 function treinoDoDia(doDia) {
@@ -41,31 +58,60 @@ function diasPorTreino() {
   return res;
 }
 
-// plano: repete o último dia deste treino (exercícios na ordem feita, mesmo nº de séries);
+// candidatos para um músculo: um por movimento (a variação usada por último), do mais usado recentemente ao menos
+function candidatosMusculo(m, ultimoUso, minimo = 0.5) {
+  const porMov = {};
+  for (const e of EXERCICIOS) {
+    if ((e.musculos[m] || 0) < minimo || e.custom) continue;
+    const atual = porMov[e.mov];
+    if (!atual || (ultimoUso[e.id] || 0) > (ultimoUso[atual.id] || 0)) porMov[e.mov] = e;
+  }
+  return Object.values(porMov).sort((a, b) => (ultimoUso[b.id] || 0) - (ultimoUso[a.id] || 0));
+}
+// o músculo já tem exercício no plano: é o principal de algum item ou trabalha bastante nele
+const musculoCoberto = (m, itens) => itens.some(id => { const e = exMap[id]; return e && (musculoDe(e) === m || (e.musculos[m] || 0) >= 0.3); });
+
+// plano: repete o último dia deste treino (exercícios na ordem feita, mesmo nº de séries), sem os exercícios
+// de outro treino (ex.: tríceps num dia de Puxar) e com um exercício a mais para cada músculo principal que ficou de fora;
 // sem histórico, monta 5 exercícios pelos músculos do treino
 function planoTreino(t, dias) {
   const hoje = hojeKey();
-  const ant = (dias[t.id] || []).find(d => d.dia !== hoje);
-  if (ant) {
-    const itens = [...new Set(ant.logs.map(l => l.ex))].filter(id => exMap[id]);
-    const series = {};
-    for (const l of ant.logs) series[l.ex] = (series[l.ex] || 0) + l.sets.length;
-    if (itens.length) return { ts: ant.logs[0].ts, itens, series };
-  }
   const ultimoUso = {};
   logs.forEach(l => { ultimoUso[l.ex] = Math.max(ultimoUso[l.ex] || 0, l.ts); });
+  const ant = (dias[t.id] || []).find(d => d.dia !== hoje);
+  if (ant) {
+    const itens = [...new Set(ant.logs.map(l => l.ex))].filter(id => exMap[id] && exNoTreino(exMap[id], t));
+    const series = {};
+    for (const l of ant.logs) series[l.ex] = (series[l.ex] || 0) + l.sets.length;
+    if (itens.length) {
+      const movs_ = new Set(itens.map(id => exMap[id].mov));
+      for (const m of t.principais) {
+        if (musculoCoberto(m, itens)) continue;
+        const e = candidatosMusculo(m, ultimoUso).find(x => !movs_.has(x.mov) && musculoDe(x) === m);
+        if (e) { itens.push(e.id); movs_.add(e.mov); }
+      }
+      return { ts: ant.logs[0].ts, itens, series };
+    }
+  }
   const itens = [], usados = new Set();
   t.musculos.forEach((m, i) => {
-    const porMov = {};
-    for (const e of EXERCICIOS) {
-      if ((e.musculos[m] || 0) < 0.5 || usados.has(e.mov) || e.custom) continue;
-      const atual = porMov[e.mov];
-      if (!atual || (ultimoUso[e.id] || 0) > (ultimoUso[atual.id] || 0)) porMov[e.mov] = e;
-    }
-    const cands = Object.values(porMov).sort((a, b) => (ultimoUso[b.id] || 0) - (ultimoUso[a.id] || 0));
+    const cands = candidatosMusculo(m, ultimoUso).filter(e => !usados.has(e.mov));
     for (const e of cands.slice(0, i < 2 ? 2 : 1)) if (itens.length < 5) { itens.push(e.id); usados.add(e.mov); }
   });
   return { ts: 0, itens, series: {} };
+}
+
+// exercícios do card do dia: o plano e, com o treino em andamento, também o que já foi feito hoje fora do plano
+function itensDoDia(t, plano, andamento) {
+  if (!andamento) return plano.itens;
+  const feitos = [...new Set(logs.filter(l => dayKey(l.ts) === hojeKey()).map(l => l.ex))];
+  return [...plano.itens, ...feitos.filter(id => exMap[id] && !plano.itens.includes(id))];
+}
+// rotina implícita do treino de hoje: dá o "Próximo" mesmo quando o exercício foi aberto pela grade
+function rotinaDoDia() {
+  const t = treinoFixo();
+  if (!t || (ativo.ex && exMap[ativo.ex] && !exNoTreino(exMap[ativo.ex], t))) return null;
+  return { id: 'dia', nome: t.nome, itens: itensDoDia(t, planoTreino(t, diasPorTreino()), true) };
 }
 
 function estadoTreinos() {
@@ -80,9 +126,10 @@ function estadoTreinos() {
   });
 }
 
-// sugerido: o treino que o dia já começou; senão o feito há mais tempo que já recuperou (≥ 60%)
+// sugerido: o treino que o dia já começou (o escolhido ao começar, ou o dos registros de hoje); senão o feito há mais tempo que já recuperou (≥ 60%)
 function treinoSugerido(est) {
-  const andamento = est.find(e => e.hoje);
+  const fixo = treinoFixo();
+  const andamento = (fixo && est.find(e => e.t === fixo)) || est.find(e => e.hoje);
   if (andamento) return andamento;
   const ord = est.slice().sort((a, b) => a.ultTs - b.ultTs);
   const livre = e => e.pct >= 60;
@@ -109,6 +156,7 @@ function alvoTxt(exId) {
 
 function comecarTreino(t, itens) {
   if (!itens.length) return toast('Escolha um grupo abaixo para montar o treino.');
+  fixaTreino(t);
   const feitos = new Set(logs.filter(l => dayKey(l.ts) === hojeKey()).map(l => l.ex));
   ativo.rotina = 'rep';
   ativo.rotinaTemp = { id: 'rep', nome: t.nome, itens };
@@ -122,6 +170,8 @@ function renderDia() {
   $('sec-outros').hidden = true;
   treinoDoCard = null;
   if (!logs.length) return renderPrimeiroUso(el, est);
+  // treinou hoje sem tocar em "Começar" (pela grade): o treino dos registros de hoje fica escolhido até o dia acabar
+  if (!treinoFixo()) { const h = est.find(x => x.hoje); if (h) fixaTreino(h.t); }
   const escolhido = treinoEscolha && est.find(x => x.t.id === treinoEscolha);
   const e = escolhido || treinoSugerido(est);
   if (!e) return renderDescanso(el, est);
@@ -135,8 +185,8 @@ function renderHero(el, e) {
   const plano = planoTreino(t, e.dias);
   const doDia = logs.filter(l => dayKey(l.ts) === hoje);
   const feitos = new Set(doDia.map(l => l.ex));
-  const andamento = e.hoje;
-  const itens = andamento ? [...plano.itens, ...[...feitos].filter(id => exMap[id] && !plano.itens.includes(id))] : plano.itens;
+  const andamento = e.hoje || treinoFixo() === t;
+  const itens = itensDoDia(t, plano, andamento);
   const nFeitos = itens.filter(id => feitos.has(id)).length;
   const setsHoje = id => doDia.filter(l => l.ex === id).reduce((s, l) => s + l.sets.length, 0);
   const linhas = itens.map((id, i) => feitos.has(id)
@@ -242,8 +292,11 @@ function renderPrimeiroUso(el) {
 
 // ---------- repetir o último treino de um grupo (lista do grupo) ----------
 // último treino de um grupo: exercícios do dia mais recente, na ordem em que foram feitos
+// (com um treino escolhido hoje, só os que cabem nele: em dia de Puxar, Braços repete o bíceps, não o tríceps)
 function ultimoTreinoGrupo(grupo) {
-  const doGrupo = logs.filter(l => exMap[l.ex] && exMap[l.ex].cat === grupo && dayKey(l.ts) !== hojeKey());
+  const g = gruposVisiveis().find(x => x.id === grupo);
+  const tDia = g && treinoDeHoje() && grupoNoTreino(g, treinoDeHoje()) ? treinoDeHoje() : null;
+  const doGrupo = logs.filter(l => exMap[l.ex] && exMap[l.ex].cat === grupo && dayKey(l.ts) !== hojeKey() && (!tDia || exNoTreino(exMap[l.ex], tDia)));
   if (!doGrupo.length) return null;
   const dia = dayKey(Math.max(...doGrupo.map(l => l.ts)));
   const doDia = doGrupo.filter(l => dayKey(l.ts) === dia).sort((a, b) => a.ts - b.ts);

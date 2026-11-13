@@ -106,7 +106,14 @@ function renderListaGrupo(el) {
     if (!secoes.length || secoes[secoes.length - 1].sub !== sub) secoes.push({ sub, movs: [] });
     secoes[secoes.length - 1].movs.push(m);
   }
-  html += secoes.map((sc, i) => `${sc.sub ? `<div class="kicker" style="padding:${i ? '10px' : '0'} 4px 0">${esc(sc.sub)}</div>` : ''}
+  // grupo com mais de um treino (Braços): os subgrupos do treino de hoje vêm primeiro; os outros ficam no fim, avisados
+  const tDia = treinoDeHoje();
+  if (tDia && temSub) {
+    secoes.forEach(sc => { sc.fora = sc.movs.every(m => !exNoTreino(m, tDia)); });
+    if (secoes.some(sc => !sc.fora)) secoes.sort((a, b) => a.fora - b.fora);
+    else secoes.forEach(sc => { sc.fora = false; });
+  }
+  html += secoes.map((sc, i) => `${sc.sub ? `<div class="kicker" style="padding:${i ? '10px' : '0'} 4px 0">${esc(sc.sub)}${sc.fora ? ` <span class="mudo">· fora do treino de ${esc(tDia.nome)}</span>` : ''}</div>` : ''}
     <div class="lista">${sc.movs.map(m => linhaMov(m, ultimo, recup)).join('')}</div>`).join('');
   corpo.innerHTML = html + '</div>';
   if (u) $('bt-repetir').onclick = () => repetirTreino(ativo.grupo);
