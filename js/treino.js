@@ -96,25 +96,39 @@ function renderListaGrupo(el) {
   let html = u ? `<button class="ghost bt-repetir" id="bt-repetir">${ic('arrow-counter-clockwise', 'ic-22')}
       <span class="ll-txt"><span class="ll-nome">Repetir treino de ${dataCurta(u.ts)}</span>
       <span class="ll-det">${esc([...new Set(u.itens.filter(id => exMap[id]).map(id => movMap[exMap[id].mov].nome))].join(', '))}</span></span>${ic('caret-right')}</button>` : '';
-  html += `<div class="secao"><div class="secao-cab"><span class="kicker">${plural(lista.length, 'exercício', 'exercícios')}</span>
+  // filtro por equipamento (só aparece se o grupo tem mais de um tipo); lembrado por grupo
+  const tiposGrupo = TIPOS_EQ.filter(t => lista.some(m => m.vars.some(v => tipoEq(exMap[v.id]) === t.id)));
+  const filtros = prefs.filtroEq || {};
+  const filtro = tiposGrupo.length > 1 && tiposGrupo.some(t => t.id === filtros[ativo.grupo]) ? filtros[ativo.grupo] : null;
+  const varsOk = m => m.vars.map(v => exMap[v.id]).filter(e => !filtro || tipoEq(e) === filtro);
+  const listaF = lista.filter(m => varsOk(m).length);
+  if (tiposGrupo.length > 1) html += `<div class="chips rolar filtro-eq" role="radiogroup" aria-label="Equipamento">
+    <button class="chip" role="radio" data-eq="" aria-checked="${!filtro}">Tudo</button>${tiposGrupo.map(t =>
+      `<button class="chip" role="radio" data-eq="${t.id}" aria-checked="${filtro === t.id}">${ic(t.ic, 'ic-16')}${esc(t.nome)}</button>`).join('')}</div>`;
+  html += `<div class="secao"><div class="secao-cab"><span class="kicker">${plural(listaF.length, 'exercício', 'exercícios')}</span>
     <span class="legenda-foco"><span><span class="ponto"></span>foco</span><span><span class="ponto aux"></span>auxiliar</span></span></div>`;
   // subgrupos (ex.: Quadríceps, Posteriores); personalizado não "herda" o subgrupo de cima
   const temSub = lista.some(m => m.sub);
   const secoes = [];
-  for (const m of lista) {
+  for (const m of listaF) {
     const sub = m.sub || (temSub ? 'Personalizados' : null);
     if (!secoes.length || secoes[secoes.length - 1].sub !== sub) secoes.push({ sub, movs: [] });
     secoes[secoes.length - 1].movs.push(m);
   }
   html += secoes.map((sc, i) => `${sc.sub ? `<div class="kicker" style="padding:${i ? '10px' : '0'} 4px 0">${esc(sc.sub)}</div>` : ''}
-    <div class="lista">${sc.movs.map(m => linhaMov(m, ultimo, recup)).join('')}</div>`).join('');
+    <div class="lista">${sc.movs.map(m => linhaMov(m, ultimo, recup, varsOk(m))).join('')}</div>`).join('');
   corpo.innerHTML = html + '</div>';
   if (u) $('bt-repetir').onclick = () => repetirTreino(ativo.grupo);
   corpo.querySelectorAll('.mov[data-ex]').forEach(b => b.onclick = () => abrirExercicio(b.dataset.ex));
+  corpo.querySelectorAll('[data-eq]').forEach(b => b.onclick = () => {
+    prefs.filtroEq = { ...(prefs.filtroEq || {}), [ativo.grupo]: b.dataset.eq || null };
+    salvarPrefs();
+    renderListaGrupo(el);
+  });
+  mostraChipMarcado(corpo.querySelector('.filtro-eq'));
 }
 
-function linhaMov(m, ultimo, recup) {
-  const vars = m.vars.map(v => exMap[v.id]);
+function linhaMov(m, ultimo, recup, vars = m.vars.map(v => exMap[v.id])) {
   const recente = vars.filter(v => ultimo[v.id]).sort((a, b) => ultimo[b.id].ts - ultimo[a.id].ts)[0];
   const abre = recente || vars[0];
   const fi = focoInfo({ musculos: m.musculos, foco: m.foco || [] });
@@ -193,8 +207,9 @@ function renderPainel(el) {
       <span><button class="btn-ic" id="bt-nota-ic" aria-label="Anotação">${ic('note-pencil', 'ic-22')}</button><button class="btn-ic" id="bt-mais" aria-label="Mais opções">${ic('dots-three', 'ic-22')}</button></span></div>
     <h1 class="p-titulo">${esc(mov.nome)}</h1>
     <div class="chips rolar p-vars" role="radiogroup" aria-label="Variação">${mov.vars.map(v =>
-      `<button class="chip" role="radio" aria-checked="${v.id === ex.id}" data-var="${v.id}">${esc(v.nome)}</button>`).join('')}
+      `<button class="chip" role="radio" aria-checked="${v.id === ex.id}" data-var="${v.id}" title="${esc(nomeEq(exMap[v.id]))}">${ic(infoTipoEq(exMap[v.id]).ic, 'ic-16')}${esc(v.nome)}</button>`).join('')}
       <button class="chip chip-mais" data-novavar="${mov.id}" aria-label="Nova variação">${ic('plus', 'ic-16')}</button></div>
+    <div class="p-eq mudo">${ic(infoTipoEq(ex).ic, 'ic-16')}${esc(infoTipoEq(ex).nome)}${tipoEq(ex) !== 'livre' ? ` · ${esc(nomeEq(ex))}` : ''}</div>
     <div class="card alvo-card" id="ref"></div>
     <div class="secao" id="sec-series" hidden><div class="kicker">Séries de hoje</div><div class="lista series-lista" id="series"></div><div id="esforco"></div></div>
     <div class="midia">
@@ -213,6 +228,7 @@ function renderPainel(el) {
     </div>`;
   $('bt-voltar').onclick = () => fecharExercicio(false);
   el.querySelectorAll('[data-var]').forEach(b => b.onclick = () => abrirExercicio(b.dataset.var));
+  mostraChipMarcado(el.querySelector('.p-vars'));
   el.querySelector('[data-novavar]').onclick = () => novaVariacao(mov.id);
   $('bt-nota-ic').onclick = editarNota;
   $('bt-mais').onclick = () => menuPainel(ex);
