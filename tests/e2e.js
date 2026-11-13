@@ -83,7 +83,7 @@ async function novaPagina(browser, base, dados) {
     ok(await pg.locator('#outros-treinos [data-treino]').count() === 2, 'mostra os outros dois treinos');
     await pg.click('#bt-comecar');
     await pg.waitForTimeout(200);
-    ok(await pg.evaluate(() => ativo.ex === 'agachamento' && ativo.rotinaTemp.itens.join() === 'agachamento,leg_press'), 'começar o treino abre o 1º exercício do plano');
+    ok(await pg.evaluate(() => ativo.ex === 'agachamento' && ativo.rotinaTemp.itens.join().startsWith('agachamento,leg_press')), 'começar o treino abre o 1º exercício do plano');
     ok((await pg.textContent('#p-fim')).includes('Leg press'), 'oferece o próximo exercício do treino');
     await pg.click('#bt-voltar');
     await pg.click('#bt-voltar');
@@ -108,6 +108,39 @@ async function novaPagina(browser, base, dados) {
     ok((await pg.textContent('[data-grupo="Peito"] .g-quando')).includes('5 dias'), 'grade mostra há quanto tempo cada grupo foi treinado');
     ok(await pg.isHidden('#bt-salvar-rotina'), '"Nova" rotina só aparece depois de treinar no dia');
     ok(!pg.erros.length, 'sem erros de página (divisão) ' + pg.erros.join(' | '));
+  }
+
+  // 3c) dia de puxar: tríceps não entra no plano, falta de bíceps é completada, e o treino começado fica até o fim do dia
+  {
+    const pg = await novaPagina(browser, base, {
+      'carga.logs': [
+        { id: 1, ex: 'puxada_frontal', ts: agora - 5 * D, sets: [{ peso: 50, reps: 10, ts: agora - 5 * D }, { peso: 50, reps: 10, ts: agora - 5 * D + 1e5 }] },
+        { id: 2, ex: 'remada_baixa', ts: agora - 5 * D + 6e5, sets: [{ peso: 40, reps: 10, ts: agora - 5 * D + 6e5 }] },
+        { id: 3, ex: 'triceps_pulley', ts: agora - 5 * D + 9e5, sets: [{ peso: 20, reps: 12, ts: agora - 5 * D + 9e5 }] },
+        { id: 4, ex: 'supino_reto', ts: agora - 3 * D, sets: [{ peso: 60, reps: 10, ts: agora - 3 * D }] },
+        { id: 5, ex: 'agachamento', ts: agora - 2 * D, sets: [{ peso: 80, reps: 8, ts: agora - 2 * D }] },
+      ],
+      'carga.prefs': { contagem: 0 },
+    });
+    ok((await pg.textContent('#card-dia .titulo')).includes('Puxar'), 'sugere Puxar');
+    const plano = await pg.evaluate(() => { const it = planoTreino(TREINOS[1], diasPorTreino()).itens; return { ids: it.join(), tri: it.some(id => musculoDe(exMap[id]) === 'triceps'), bi: it.some(id => musculoDe(exMap[id]) === 'biceps') }; });
+    ok(!plano.tri && plano.bi, 'plano de Puxar sem tríceps e com bíceps: ' + plano.ids);
+    ok(await pg.locator('.grupo.sugerido[data-grupo="Braços"]').count() === 1, 'Braços entra no treino de Puxar pelo bíceps');
+    await pg.click('#bt-comecar');
+    await pg.waitForTimeout(200);
+    await pg.click('#bt-voltar');
+    await pg.click('#bt-voltar');
+    ok((await pg.textContent('#card-dia')).includes('Em andamento') && (await pg.textContent('#bt-comecar')).includes('Continuar'), 'voltar ao início sem registrar mantém o treino em andamento');
+    await pg.reload();
+    await pg.waitForTimeout(300);
+    ok((await pg.textContent('#card-dia')).includes('Em andamento') && (await pg.textContent('#card-dia .titulo')).includes('Puxar'), 'o treino começado continua escolhido depois de recarregar');
+    await pg.click('[data-grupo="Braços"]');
+    const kick = await pg.locator('#grupo-corpo .kicker').allTextContents();
+    ok(kick.findIndex(k => k.startsWith('Bíceps')) < kick.findIndex(k => k.startsWith('Tríceps')) && kick.some(k => k.includes('fora do treino de Puxar')), 'em Braços, tríceps vai para o fim e avisa que é de outro treino');
+    await pg.click('.mov[data-ex="rosca_direta"]');
+    await pg.waitForTimeout(200);
+    ok((await pg.textContent('#p-fim')).includes('Próximo'), 'aberto pela grade, o exercício do treino de hoje oferece o próximo');
+    ok(!pg.erros.length, 'sem erros de página (treino do dia) ' + pg.erros.join(' | '));
   }
 
   // 4) unilateral, progressão pelo esforço e estagnação
