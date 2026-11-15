@@ -9,6 +9,17 @@ const DIETA_PADRAO = () => ({ plano: {}, estoque: {}, diario: {}, fatores: {}, m
 let dieta = Object.assign(DIETA_PADRAO(), lerLS(LS_DIETA, {}));
 Object.assign(ALIMENTOS, dieta.custom); // alimentos que você cadastrou (rótulo, código de barras)
 SECOES_NUT.push('Meus alimentos');
+// plano novo: o cardápio da semana passa para as opções equivalentes; trocas de hoje em diante caem
+if ((dieta.planoVer || 1) < PLANO_VER) {
+  for (const dia of Object.values(dieta.plano)) for (const [ref, cel] of Object.entries(dia)) {
+    if (!REFEICOES.some(r => r.id === ref)) delete dia[ref];
+    else if (MIGRA_PLANO[ref]) cel.op = MIGRA_PLANO[ref][cel.op] ?? 0;
+  }
+  const hoje = hojeKey();
+  for (const [k, d] of Object.entries(dieta.diario)) if (k >= hoje && d.troca) d.troca = {};
+  dieta.planoVer = PLANO_VER;
+  localStorage.setItem(LS_DIETA, JSON.stringify(dieta));
+}
 const salvarDieta = () => localStorage.setItem(LS_DIETA, JSON.stringify(dieta));
 
 let nutTela = 'hoje', nutDia = new Date().getDay(), rasc = {}, corpoForm = false, nutAberta = null, avAberto = {};
@@ -32,7 +43,7 @@ function itensDe(ref, cel) {
     if (!it.esc) return { a: it.a, q: it.q ?? ALIMENTOS[it.a].av ?? 100, av: !!it.av };
     const g = ESCOLHAS[it.esc], id = (cel.esc && cel.esc[it.esc]) || escPadrao(it.esc, ref);
     const o = g.ops.find(x => opId(x) === id) || g.ops[0];
-    return { a: opId(o), q: it.q ?? o.q, esc: it.esc };
+    return { a: opId(o), q: it.q ?? o.q * (it.x || 1), esc: it.esc };
   });
 }
 

@@ -199,28 +199,28 @@ async function novaPagina(browser, base, dados) {
   {
     const pg = await novaPagina(browser, base, { 'carga.dieta': { estoque: { ovo: 12, arroz: 100 } } });
     await pg.click('[data-tab="nutricao"]');
-    ok(await pg.locator('.nut-ref.hero[data-ref="cafe"]').count() === 1 && await pg.locator('[data-abrir]').count() === 5 && await pg.locator('[data-ref="extra"]').count() === 1, 'Hoje: próxima refeição em destaque, as outras 5 recolhidas e o fora do plano');
-    await pg.fill('[data-ref="cafe"] input[data-i="1"]', '3');
+    ok(await pg.locator('.nut-ref.hero[data-ref="cafe"]').count() === 1 && await pg.locator('[data-abrir]').count() === 4 && await pg.locator('[data-ref="extra"]').count() === 1, 'Hoje: próxima refeição em destaque, as outras 4 recolhidas e o fora do plano');
+    await pg.fill('[data-ref="cafe"] input[data-i="1"]', '4');
     await pg.dispatchEvent('[data-ref="cafe"] input[data-i="1"]', 'input');
     await pg.click('[data-ref="cafe"] [data-comi]');
     const reg = await pg.evaluate(() => dieta.diario[hojeKey()].refs.cafe);
-    ok(reg.itens.find(i => i.a === 'ovo').q === 3 && await pg.evaluate(() => dieta.estoque.ovo) === 9, 'Comi salva o peso digitado e tira do estoque');
-    ok(await pg.textContent('.nut-barra b') === '432' && await pg.locator('.nut-ref.hero[data-ref="colacao"]').count() === 1, 'calorias do dia somam o que foi comido e a próxima refeição vira o destaque');
+    ok(reg.itens.find(i => i.a === 'ovo').q === 4 && await pg.evaluate(() => dieta.estoque.ovo) === 8, 'Comi salva o peso digitado e tira do estoque');
+    ok(await pg.textContent('.nut-barra b') === '533' && await pg.locator('.nut-ref.hero[data-ref="colacao"]').count() === 1, 'calorias do dia somam o que foi comido e a próxima refeição vira o destaque');
     await pg.click('[data-agua="500"]');
     ok(await pg.evaluate(() => dieta.diario[hojeKey()].agua) === 500, 'conta a água');
     await pg.click('[data-abrir="cafe"]');
     await pg.click('[data-ref="cafe"] [data-desfazer]');
     ok(await pg.evaluate(() => dieta.estoque.ovo) === 12 && !(await pg.evaluate(() => dieta.diario[hojeKey()].refs.cafe)), 'desfazer devolve ao estoque');
-    // cardápio: almoço opção 3 (macarrão) na semana toda
+    // cardápio: almoço opção 2 (macarrão) na semana toda
     await pg.click('[data-nt="cardapio"]');
     await pg.click('[data-ref="almoco"] [data-trocar]');
-    await pg.click('#folha [data-i="2"]');
+    await pg.click('#folha [data-i="1"]');
     await pg.click('#bt-repetir-dia');
-    ok(await pg.evaluate(() => [0, 1, 2, 3, 4, 5, 6].every(d => dieta.plano[d].almoco.op === 2)), 'cardápio copia o dia para a semana');
+    ok(await pg.evaluate(() => [0, 1, 2, 3, 4, 5, 6].every(d => dieta.plano[d].almoco.op === 1)), 'cardápio copia o dia para a semana');
     await pg.click('[data-nt="carrinho"]');
     const sem = await pg.evaluate(() => Object.fromEntries(listaCompras().map(l => [l.a, l.falta])));
-    // macarrão: 180 g cozido × 7 almoços × 0,44 = 554 g cru → 750 (passo de 250 g); patinho (moída no almoço + jantar) 3,07 kg → 3,5 kg; ovos 14 − 12 → 1 dúzia
-    ok(sem.macarrao === 750 && sem.patinho === 3500 && !sem.arroz && sem.ovo === 12, 'carrinho da semana converte cozido → cru e desconta o estoque');
+    // macarrão: 200 g cozido × 7 almoços × 0,44 = 616 g cru → 750 (passo de 250 g); patinho (moída no almoço + jantar) 3,72 kg → 4 kg; ovos 21 − 12 → 1 dúzia
+    ok(sem.macarrao === 750 && sem.patinho === 4000 && !sem.arroz && sem.ovo === 12, 'carrinho da semana converte cozido → cru e desconta o estoque');
     await pg.click('[data-per="mes"]');
     const mes = await pg.evaluate(() => Object.fromEntries(listaCompras().map(l => [l.a, l.falta])));
     ok(mes.rap10 === 60 && (await pg.textContent('#nut-corpo')).includes('60 un · 6 pacotes'), 'carrinho do mês: 30 dias, com pacotes');
@@ -230,6 +230,16 @@ async function novaPagina(browser, base, dados) {
     await pg.click('#bt-guardar');
     ok(await pg.evaluate(() => dieta.estoque.whey) === 2000, 'guardar compras soma no estoque');
     ok(!pg.erros.length, 'sem erros de página (nutrição) ' + pg.erros.join(' | '));
+  }
+
+  // 8b) plano novo (12/11): cardápio salvo vai para as opções equivalentes e o Rap10 do jantar troca por 4 fatias de pão
+  {
+    const pg = await novaPagina(browser, base, { 'carga.dieta': { plano: { 1: { cafe: { op: 1, esc: {} }, almoco: { op: 1, esc: {} }, sobremesa: { op: 0, esc: {} }, jantar: { op: 3, esc: {} } } } } });
+    const p = await pg.evaluate(() => dieta.plano[1]);
+    ok(p.cafe.op === 3 && p.almoco.op === 2 && !p.sobremesa && p.jantar.op === 0 && await pg.evaluate(() => dieta.planoVer === PLANO_VER), 'plano antigo migra: crepioca, batata doce, sem sobremesa');
+    const pao = await pg.evaluate(() => itensDe('jantar', { op: 0, esc: { rap: 'pao_forma' } }).find(i => i.esc === 'rap'));
+    ok(pao.a === 'pao_forma' && pao.q === 4, 'jantar: 2 Rap10 = 4 fatias de pão de forma');
+    ok(!pg.erros.length, 'sem erros de página (plano novo) ' + pg.erros.join(' | '));
   }
 
   // 9) comida flexível: trocar/remover/adicionar, alimento por código de barras, só calorias, repetir ontem, aderência e leitura do rótulo
@@ -462,7 +472,7 @@ async function novaPagina(browser, base, dados) {
     ok(its[0].a === 'ovo_frito' && its[0].q === 2 && its[1].a === 'arroz_integral' && its[1].q === 90 && its[2].a === 'pao_frances' && its[2].q === 1.5,
       'registra preparo e quantidade (unidades, medida caseira e gramas convertidas em unidades)');
     ok(await pg.evaluate(() => dieta.estoque.ovo) === 10, 'ovo frito tira ovos do estoque');
-    ok(await pg.evaluate(() => seguiuPlano('cafe', { op: 0, esc: {} }, [{ a: 'pao_frances', q: 1 }, { a: 'ovo_mexido', q: 2 }, { a: 'mamao', q: 100 }, { a: 'cafe', q: 200 }])), 'ovo mexido no lugar do cozido ainda conta como seguir o plano');
+    ok(await pg.evaluate(() => seguiuPlano('cafe', { op: 0, esc: {} }, [{ a: 'pao_frances', q: 1 }, { a: 'ovo_mexido', q: 3 }, { a: 'maca', q: 1 }, { a: 'cafe', q: 200 }])), 'ovo mexido no lugar do cozido ainda conta como seguir o plano');
     ok(!pg.erros.length, 'sem erros de página (alimentos comuns) ' + pg.erros.join(' | '));
   }
 

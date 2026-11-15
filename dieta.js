@@ -6,7 +6,7 @@
       fruta com casca > 1). Sem f = 1. */
 'use strict';
 
-const META_AGUA = 2100; // ml por dia
+const META_AGUA = 2200; // ml por dia
 const SECOES_NUT = ['Hortifruti', 'Frutas', 'Carnes', 'Padaria', 'Mercearia', 'Ovos e laticínios', 'Suplementos'];
 
 const ALIMENTOS = {
@@ -17,6 +17,7 @@ const ALIMENTOS = {
   tapioca:    { nome: 'Goma de tapioca', sec: 'Mercearia', un: 'g', m: [240, 0, 59, 0] },
   aveia:      { nome: 'Aveia em flocos', sec: 'Mercearia', un: 'g', m: [394, 13.9, 66.6, 8.5] },
   amendoim:   { nome: 'Pasta de amendoim', sec: 'Mercearia', un: 'g', m: [588, 25, 20, 50] },
+  cuscuz:     { nome: 'Cuscuz de milho', nomeCompra: 'Flocão de milho', sec: 'Mercearia', un: 'g', m: [113, 2.2, 25.3, 0.7], f: 0.5 },
   cafe:       { nome: 'Café', nomeCompra: 'Café em pó', sec: 'Mercearia', un: 'ml', m: [9, 0.7, 1.5, 0.1], f: 0.05 },
 
   frango:     { nome: 'Filé de frango', sec: 'Carnes', un: 'g', m: [159, 32, 0, 2.5], f: 1.33 },
@@ -34,6 +35,7 @@ const ALIMENTOS = {
   rap10:      { nome: 'Rap10', sec: 'Padaria', un: 'un', gUn: 40, m: [290, 7.8, 52.5, 5.5], pac: [10, 'pacote', 'pacotes'] },
 
   ovo:        { nome: 'Ovo', sec: 'Ovos e laticínios', un: 'un', gUn: 50, m: [146, 13.3, 0.6, 9.5], pac: [12, 'dúzia', 'dúzias'] },
+  mussarela:  { nome: 'Queijo mussarela', sec: 'Ovos e laticínios', un: 'g', m: [330, 22.6, 3, 25.2] },
   requeijao:  { nome: 'Requeijão light', sec: 'Ovos e laticínios', un: 'g', m: [185, 11, 3.5, 14] },
 
   whey:       { nome: 'Whey protein', sec: 'Suplementos', un: 'g', m: [400, 80, 10, 5] },
@@ -48,6 +50,7 @@ const ALIMENTOS = {
   maca:       { nome: 'Maçã', sec: 'Frutas', un: 'un', gUn: 130, m: [56, 0.3, 15.2, 0] },
   pera:       { nome: 'Pêra', sec: 'Frutas', un: 'un', gUn: 150, m: [53, 0.6, 14, 0.1] },
   mexerica:   { nome: 'Mexerica', sec: 'Frutas', un: 'un', gUn: 120, m: [38, 0.8, 9.6, 0.1] },
+  abacate:    { nome: 'Abacate', sec: 'Frutas', un: 'g', m: [96, 1.2, 6, 8.4], f: 1.4 },
 
   // à vontade: av = quantidade estimada por refeição (você corrige pesando)
   folhas:     { nome: 'Folhas (alface, rúcula…)', sec: 'Hortifruti', un: 'g', m: [11, 1.3, 1.7, 0.2], av: 40 },
@@ -63,42 +66,46 @@ const ALIMENTOS = {
   mandioca:   { nome: 'Mandioca', sec: 'Hortifruti', un: 'g', m: [125, 0.6, 30.1, 0.3], f: 1.1 },
 };
 
-// itens com escolha: a opção diz o grupo, você escolhe qual alimento (q do item vale para todos)
+// itens com escolha: a opção diz o grupo, você escolhe qual alimento (q do item vale para todos;
+// x multiplica a quantidade de cada opção: 2 Rap10 = 4 fatias de pão de forma = 2 pães)
 const ESCOLHAS = {
   carne: { nome: 'Carne', ops: ['frango', 'patinho', 'alcatra', 'coxao', 'mignon', 'tilapia', 'figado'] },
   moida: { nome: 'Carne moída', ops: ['patinho', 'coxao', 'acem'] },
   pao:   { nome: 'Pão', ops: [{ a: 'pao_frances', q: 1 }, { a: 'pao_forma', q: 2 }] },
+  rap:   { nome: 'Rap10 ou pão', ops: [{ a: 'rap10', q: 1 }, { a: 'pao_forma', q: 2 }, { a: 'pao_frances', q: 1 }] },
   fruta: { nome: 'Fruta', ops: [{ a: 'maca', q: 1 }, { a: 'pera', q: 1 }, { a: 'laranja', q: 1 }, { a: 'mexerica', q: 1 }, { a: 'ameixa', q: 3 },
     { a: 'melancia', q: 100 }, { a: 'melao', q: 100 }, { a: 'mamao', q: 100 }, { a: 'abacaxi', q: 100 }] },
 };
 
 const av = a => ({ a, av: true });
+// plano de 12/11/2026 (2ª consulta)
 const REFEICOES = [
   { id: 'cafe', nome: 'Café da manhã', hora: '08:30', ops: [
-    { nome: 'Pão com ovos mexidos', itens: [{ esc: 'pao' }, { a: 'ovo', q: 2 }, { a: 'mamao', q: 100 }, { a: 'cafe', q: 200 }] },
-    { nome: 'Crepioca com requeijão', itens: [{ a: 'tapioca', q: 30 }, { a: 'ovo', q: 2 }, { a: 'requeijao', q: 15 }, { a: 'melao', q: 100 }, { a: 'cafe', q: 200 }] },
-    { nome: 'Pão com frango desfiado', itens: [{ esc: 'pao' }, { a: 'frango', q: 50 }, { a: 'ameixa', q: 3 }, { a: 'cafe', q: 200 }] },
-    { nome: 'Pão de queijo com ovos', itens: [{ a: 'pao_queijo', q: 3 }, { a: 'ovo', q: 2 }, { a: 'pera', q: 1 }, { a: 'cafe', q: 200 }] },
+    { nome: 'Pão com ovos mexidos', itens: [{ esc: 'pao' }, { a: 'ovo', q: 3 }, { esc: 'fruta' }, { a: 'cafe', q: 200 }] },
+    { nome: 'Rap10 com carne ou frango', itens: [{ esc: 'rap' }, { esc: 'carne', q: 80 }, { esc: 'fruta' }, { a: 'cafe', q: 200 }] },
+    { nome: 'Cuscuz com carne ou frango', itens: [{ a: 'cuscuz', q: 80 }, { esc: 'carne', q: 80 }, { esc: 'fruta' }, { a: 'cafe', q: 200 }] },
+    { nome: 'Crepioca com mussarela', itens: [{ a: 'tapioca', q: 30 }, { a: 'ovo', q: 2 }, { a: 'mussarela', q: 20 }, { esc: 'fruta' }, { a: 'cafe', q: 200 }] },
   ] },
   { id: 'colacao', nome: 'Colação', hora: '10:00', ops: [
-    { nome: 'Whey com banana', itens: [{ a: 'whey', q: 30 }, { a: 'banana', q: 1 }] },
+    { nome: 'Whey com fruta', itens: [{ a: 'whey', q: 30 }, { esc: 'fruta' }] },
   ] },
   { id: 'almoco', nome: 'Almoço', hora: '13:00', ops: [
-    { nome: 'Arroz, feijão e carne', itens: [av('folhas'), av('tomate'), av('cenoura'), av('chuchu'), { a: 'arroz', q: 180 }, { a: 'feijao', q: 80 }, { esc: 'carne', q: 150 }] },
-    { nome: 'Batata doce e carne', itens: [av('folhas'), av('tomate'), av('brocolis'), av('couve_flor'), { a: 'batata_doce', q: 180 }, { esc: 'carne', q: 150 }] },
-    { nome: 'Macarrão com carne moída', itens: [av('folhas'), av('tomate'), av('abobrinha'), { a: 'macarrao', q: 180 }, { esc: 'moida', q: 150 }] },
-    { nome: 'Batata, milho e carne', itens: [av('folhas'), av('tomate'), av('beterraba'), { a: 'milho', q: 100 }, { a: 'batata', q: 210 }, { esc: 'carne', q: 150 }] },
-  ] },
-  { id: 'sobremesa', nome: 'Sobremesa', hora: 'após o almoço', ops: [
-    { nome: 'Fruta', itens: [{ esc: 'fruta' }] },
+    { nome: 'Arroz, feijão e carne', itens: [av('folhas'), av('tomate'), av('cenoura'), av('chuchu'), { a: 'arroz', q: 200 }, { a: 'feijao', q: 100 }, { esc: 'carne', q: 200 }] },
+    { nome: 'Macarrão com carne moída', itens: [av('folhas'), av('tomate'), av('abobrinha'), { a: 'macarrao', q: 200 }, { esc: 'moida', q: 200 }] },
+    { nome: 'Batata doce e carne', itens: [av('folhas'), av('tomate'), av('beterraba'), { a: 'batata_doce', q: 200 }, { esc: 'carne', q: 200 }] },
+    { nome: 'Mandioca e carne', itens: [av('folhas'), av('tomate'), av('brocolis'), av('couve_flor'), { a: 'mandioca', q: 200 }, { esc: 'carne', q: 200 }] },
   ] },
   { id: 'pre', nome: 'Pré-treino', hora: '1 h antes do treino', ops: [
-    { nome: 'Whey com banana, aveia e pasta de amendoim', itens: [{ a: 'whey', q: 30 }, { a: 'banana', q: 1 }, { a: 'aveia', q: 30 }, { a: 'amendoim', q: 25 }] },
+    { nome: 'Whey com abacate, aveia e pasta de amendoim', itens: [{ a: 'whey', q: 30 }, { a: 'abacate', q: 80 }, { a: 'aveia', q: 30 }, { a: 'amendoim', q: 25 }] },
   ] },
   { id: 'jantar', nome: 'Jantar', hora: '20:30', ops: [
-    { nome: 'Sanduíche de Rap10', itens: [{ a: 'rap10', q: 2 }, { esc: 'carne', q: 180 }, av('folhas'), av('tomate')] },
-    { nome: 'Mandioca e carne', itens: [av('folhas'), av('tomate'), { a: 'mandioca', q: 180 }, { esc: 'carne', q: 180 }] },
-    { nome: 'Arroz, feijão e carne', itens: [av('folhas'), av('tomate'), { a: 'arroz', q: 180 }, { a: 'feijao', q: 80 }, { esc: 'carne', q: 180 }] },
-    { nome: 'Macarrão com carne moída', itens: [av('folhas'), av('tomate'), { a: 'macarrao', q: 180 }, { esc: 'moida', q: 180 }] },
+    { nome: 'Sanduíche de Rap10', itens: [{ esc: 'rap', x: 2 }, { esc: 'carne', q: 200 }, av('folhas'), av('tomate')] },
+    { nome: 'Mandioca e carne', itens: [av('folhas'), av('tomate'), { a: 'mandioca', q: 200 }, { esc: 'carne', q: 200 }] },
+    { nome: 'Batata, milho e carne', itens: [av('folhas'), av('tomate'), { a: 'milho', q: 100 }, { a: 'batata', q: 210 }, { esc: 'carne', q: 200 }] },
+    { nome: 'Arroz, feijão e carne', itens: [av('folhas'), av('tomate'), { a: 'arroz', q: 200 }, { a: 'feijao', q: 100 }, { esc: 'carne', q: 200 }] },
   ] },
 ];
+
+// cardápio salvo no plano anterior: opção antiga → opção nova mais parecida
+const PLANO_VER = 2;
+const MIGRA_PLANO = { cafe: [0, 3, 1, 0], almoco: [0, 2, 1, 0], jantar: [0, 1, 3, 0] };
