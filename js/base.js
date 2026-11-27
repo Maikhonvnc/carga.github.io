@@ -99,6 +99,22 @@ function resumoSeries(sets, seg) {
 // ---------- catálogo: movimento → variações (cada variação é um "exercício" com histórico próprio) ----------
 const INC_EQ = { barra: 2.5, smith: 2.5, halteres: 2, maquina: 5, polia: 2.5, corpo: 2.5 };
 let EXERCICIOS = [], exMap = {}, movs = [], movMap = {};
+// equipamento: `eq` diz o que carrega (passo de carga, "0 = peso corporal"); `ap` diz o aparelho de quem usa o próprio corpo
+const TIPOS_EQ = [
+  { id: 'livre', nome: 'Sem equipamento', ic: 'person-arms-spread' },
+  { id: 'acessorios', nome: 'Barra e acessórios', ic: 'barbell' },
+  { id: 'maquina', nome: 'Máquina', ic: 'gear-six' },
+];
+const NOME_EQ = { barra: 'barra', halteres: 'halteres', maquina: 'máquina', polia: 'polia', smith: 'smith', corpo: 'sem equipamento',
+  barra_fixa: 'barra fixa', paralela: 'paralela', banco: 'banco', roda: 'roda abdominal', anilha: 'anilha' };
+const tipoEq = ex => ['maquina', 'polia', 'smith'].includes(ex.eq) ? 'maquina' : ex.eq === 'corpo' && !ex.ap ? 'livre' : 'acessorios';
+const nomeEq = ex => NOME_EQ[ex.ap] || NOME_EQ[ex.eq] || '';
+// fileira de chips rolável: traz o chip marcado para a vista (sem mexer na rolagem da página)
+function mostraChipMarcado(fila) {
+  const c = fila && fila.querySelector('[aria-checked="true"]');
+  if (c) fila.scrollLeft += c.getBoundingClientRect().left - fila.getBoundingClientRect().left - 16;
+}
+const infoTipoEq = ex => TIPOS_EQ.find(t => t.id === tipoEq(ex));
 
 function montaCatalogo() {
   movs = MOVIMENTOS.map(m => ({ ...m, vars: m.vars.slice() }));
@@ -116,6 +132,7 @@ function montaCatalogo() {
     // foto: a local da própria variação; senão a do banco aberto (fe); senão a do movimento; senão o boneco
     anim: m.anim, img: 'img' in v ? v.img : (m.img === v.id || !v.fe ? m.img : null), fe: v.fe || null,
     dicas: [...(m.dicas || []), ...(v.dica ? [v.dica] : [])],
+    eq: v.eq || 'maquina', ap: v.ap || null,
     inc: v.inc || INC_EQ[v.eq] || 2.5, corpo: v.eq === 'corpo', seg: !!m.seg, uni: !!v.uni,
     faixa: m.faixa || [8, 12], desc: m.desc || (m.tipo === 'composto' ? 120 : 75),
     custom: !!v.custom,

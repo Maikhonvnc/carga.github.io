@@ -41,7 +41,13 @@ const VIDEOS_PACOTE = {
   seatedshoulderspressbarbell: 'desenvolvimento', sideplank: 'prancha_lateral', singlelegromaniandeadliftdumbbell: 'stiff_uni',
   smithmachinebulgariansplitsquat: 'bulgaro_smith', smithmachinecalfraise: 'panturrilha_smith', smithmachinepressdecline: 'supino_declinado',
   smithmachinepressflat: 'supino_reto_smith', smithmachinepressincline: 'supino_inclinado_smith', standingfrontraisedumbell: 'elevacao_frontal',
-  trapbarshrug: 'encolhimento_maq', tricepdipmachine: 'paralelas_maq', tricepropeextension: 'triceps_corda', vbarlatpulldown: 'puxada_triangulo'
+  trapbarshrug: 'encolhimento_maq', tricepdipmachine: 'paralelas_maq', tricepropeextension: 'triceps_corda', vbarlatpulldown: 'puxada_triangulo',
+  // core (vídeos do BeFit ligados às variações novas)
+  crunchstraightlegup: 'abdominal_reto', declinesitups: 'abdominal_declinado', overheadweightsitup: 'abdominal_anilha', highplank: 'prancha_alta',
+  plankshouldertaps: 'prancha_toque', dynamicplank: 'prancha_dinamica', reversecrunch: 'abdominal_reverso',
+  captainschairstraightlegraise: 'elevacao_pernas_paralela_esticadas', abdominalbike: 'abdominal_bicicleta', alternateobliquecrunch: 'abdominal_obliquo',
+  alternateheeltouches: 'toque_calcanhar', dumbbellrussiantwist: 'russian_twist', '45degreesidebend': 'flexao_lateral_45', deadbug: 'dead_bug',
+  birddog: 'bird_dog', abwheelrollout: 'roda_abdominal', pallofpress: 'pallof', scissorskick: 'tesoura', vups: 'v_up', seatedflutterkicks: 'flutter_banco'
 };
 // também reconhece o id da variação e o nome em inglês do free-exercise-db (ex.: Barbell_Squat.mp4)
 function variacaoDoArquivo(nome) {
