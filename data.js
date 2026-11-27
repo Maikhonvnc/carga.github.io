@@ -858,3 +858,71 @@ const MOVIMENTOS = [
       { id: 'flutter_banco', nome: 'Flutter sentado no banco', eq: 'corpo', ap: 'banco' },
     ] },
 ];
+
+// ---------- classificação para volume e divisão ----------
+// Alvos de volume: os músculos do mapa, com o ombro dividido em três partes (cada uma vai para um treino).
+const ALVOS_VOL = [
+  { id: 'peito',       nome: 'Peito',              m: 'peito',       treino: 'empurrar', meta: [12, 16] },
+  { id: 'delt_ant',    nome: 'Ombro anterior',     m: 'ombros',      treino: 'empurrar', meta: null },
+  { id: 'delt_lat',    nome: 'Ombro lateral',      m: 'ombros',      treino: 'empurrar', meta: [10, 14] },
+  { id: 'triceps',     nome: 'Tríceps',            m: 'triceps',     treino: 'empurrar', meta: [10, 14] },
+  { id: 'costas',      nome: 'Costas',             m: 'costas',      treino: 'puxar',    meta: [12, 20] },
+  { id: 'delt_post',   nome: 'Ombro posterior',    m: 'ombros',      treino: 'puxar',    meta: [8, 12] },
+  { id: 'trapezio',    nome: 'Trapézio',           m: 'trapezio',    treino: 'puxar',    meta: [6, 10] },
+  { id: 'biceps',      nome: 'Bíceps',             m: 'biceps',      treino: 'puxar',    meta: [10, 14] },
+  { id: 'antebraco',   nome: 'Antebraço',          m: 'antebraco',   treino: 'puxar',    meta: null },
+  { id: 'quadriceps',  nome: 'Quadríceps',         m: 'quadriceps',  treino: 'pernas',   meta: [12, 16] },
+  { id: 'posteriores', nome: 'Posteriores',        m: 'posteriores', treino: 'pernas',   meta: [10, 14] },
+  { id: 'gluteos',     nome: 'Glúteos',            m: 'gluteos',     treino: 'pernas',   meta: [8, 12] },
+  { id: 'adutores',    nome: 'Adutores',           m: 'adutores',    treino: 'pernas',   meta: null },
+  { id: 'panturrilha', nome: 'Panturrilha',        m: 'panturrilha', treino: 'pernas',   meta: [8, 12] },
+  { id: 'lombar',      nome: 'Lombar',             m: 'lombar',      treino: 'pernas',   meta: null },
+  { id: 'abdomen',     nome: 'Abdômen',            m: 'abdomen',     treino: 'core',     meta: [6, 10] },
+];
+
+// Principal e auxiliares de cada movimento (ou variação, que tem prioridade): [principal, ...auxiliares].
+// Na contagem de volume, a série vale 1 para o principal e ½ para cada auxiliar. O treino do exercício vem do principal.
+const CLASSIFICA = {
+  // Empurrar
+  supino_reto: ['peito', 'triceps', 'delt_ant'], supino_inclinado: ['peito', 'delt_ant', 'triceps'], supino_declinado: ['peito', 'triceps'],
+  crucifixo: ['peito', 'delt_ant'], crossover: ['peito', 'delt_ant'], flexao: ['peito', 'triceps', 'delt_ant'], flexao_diamante: ['triceps', 'peito'],
+  paralelas: ['peito', 'triceps', 'delt_ant'], paralelas_maq: ['triceps', 'peito'], paralelas_banco: ['triceps'],
+  desenvolvimento: ['delt_ant', 'delt_lat', 'triceps'], elevacao_lateral: ['delt_lat'], elevacao_frontal: ['delt_ant'],
+  triceps_pulley: ['triceps'], triceps_testa: ['triceps'], triceps_frances: ['triceps'],
+  // Puxar
+  barra_fixa: ['costas', 'biceps'], puxada_frontal: ['costas', 'biceps'], pullover: ['costas', 'peito', 'triceps'], pullover_polia: ['costas'],
+  remada_curvada: ['costas', 'biceps', 'delt_post', 'trapezio'], remada_baixa: ['costas', 'biceps', 'delt_post', 'trapezio'],
+  remada_maquina: ['costas', 'biceps', 'delt_post', 'trapezio'], serrote: ['costas', 'biceps', 'delt_post'],
+  crucifixo_inverso: ['delt_post', 'trapezio', 'costas'], face_pull: ['delt_post', 'trapezio'], remada_alta: ['trapezio', 'delt_lat', 'biceps'],
+  encolhimento: ['trapezio', 'antebraco'], rosca_direta: ['biceps', 'antebraco'], rosca_alternada: ['biceps', 'antebraco'],
+  rosca_martelo: ['biceps', 'antebraco'], rosca_scott: ['biceps'], rosca_punho: ['antebraco'],
+  // Pernas
+  agachamento: ['quadriceps', 'gluteos', 'posteriores'], hack: ['quadriceps', 'gluteos'], leg_press: ['quadriceps', 'gluteos'],
+  extensora: ['quadriceps'], afundo: ['quadriceps', 'gluteos'], bulgaro: ['quadriceps', 'gluteos'], flexora: ['posteriores', 'panturrilha'],
+  stiff: ['posteriores', 'gluteos', 'lombar'], levantamento_terra: ['posteriores', 'gluteos', 'lombar', 'trapezio', 'quadriceps'],
+  hiperextensao: ['lombar', 'gluteos', 'posteriores'], elevacao_pelvica: ['gluteos', 'posteriores'], coice: ['gluteos', 'posteriores'],
+  abdutora: ['gluteos'], adutora: ['adutores'], panturrilha: ['panturrilha'],
+  // Core (fora do rodízio)
+  abdominal: ['abdomen'], prancha: ['abdomen', 'lombar'], elevacao_pernas: ['abdomen'], obliquos: ['abdomen'],
+  estabilidade_core: ['abdomen', 'lombar'], pernas_alternadas: ['abdomen'],
+};
+
+// Rotinas da divisão, versões A e B (o app alterna). Cada item: [variação, preparatórias, séries de trabalho].
+// Nenhum movimento se repete entre A e B, menos os músculos que só têm um movimento (elevação lateral, flexora,
+// panturrilha), que aparecem nas duas em variações diferentes.
+const ROTINAS_PPL = {
+  empurrar: {
+    A: { foco: 'foco peito', itens: [['supino_reto', 3, 4], ['supino_inclinado', 1, 3], ['crossover_media', 0, 3], ['elevacao_lateral', 1, 4], ['triceps_corda', 1, 3]] },
+    B: { foco: 'foco ombro', itens: [['desenv_halteres', 3, 4], ['supino_declinado_halt', 1, 3], ['crucifixo', 0, 3], ['elevacao_lateral_polia', 0, 4], ['triceps_frances_polia', 1, 3]] },
+  },
+  puxar: {
+    A: { foco: 'foco largura', itens: [['barra_fixa', 2, 4], ['remada_baixa', 1, 3], ['pullover_polia', 0, 3], ['crucifixo_inverso_maq', 1, 3], ['rosca_direta', 1, 3]] },
+    B: { foco: 'foco espessura', itens: [['remada_curvada', 3, 4], ['puxada_triangulo', 1, 3], ['face_pull', 1, 3], ['encolhimento_halt', 1, 3], ['rosca_martelo', 1, 3]] },
+  },
+  pernas: {
+    A: { foco: 'foco quadríceps', itens: [['agachamento', 3, 4], ['leg_press', 1, 3], ['extensora', 0, 3], ['flexora', 1, 3], ['panturrilha_pe', 1, 4], ['abdominal', 0, 3]] },
+    B: { foco: 'foco posterior e glúteo', itens: [['stiff', 3, 4], ['hack', 1, 3], ['elevacao_pelvica', 1, 3], ['flexora_sentada', 0, 3], ['panturrilha_sentado', 1, 4], ['elevacao_pernas', 0, 3]] },
+  },
+};
+// carga e repetições das preparatórias, pelo número delas: [fração da carga de trabalho, repetições]
+const PREP_ESQUEMA = { 1: [[0.6, 8]], 2: [[0.5, 10], [0.75, 5]], 3: [[0.5, 10], [0.7, 5], [0.85, 2]] };

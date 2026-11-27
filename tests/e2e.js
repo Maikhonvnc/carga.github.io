@@ -83,8 +83,8 @@ async function novaPagina(browser, base, dados) {
     ok(await pg.locator('#outros-treinos [data-treino]').count() === 2, 'mostra os outros dois treinos');
     await pg.click('#bt-comecar');
     await pg.waitForTimeout(200);
-    ok(await pg.evaluate(() => ativo.ex === 'agachamento' && ativo.rotinaTemp.itens.join().startsWith('agachamento,leg_press')), 'começar o treino abre o 1º exercício do plano');
-    ok((await pg.textContent('#p-fim')).includes('Leg press'), 'oferece o próximo exercício do treino');
+    ok(await pg.evaluate(() => ativo.ex === 'stiff' && ativo.rotinaTemp.itens.join().startsWith('stiff,hack')), 'último Pernas foi o A: começar abre o 1º exercício do Pernas B');
+    ok((await pg.textContent('#p-fim')).includes('Hack'), 'oferece o próximo exercício do treino');
     await pg.click('#bt-voltar');
     await pg.click('#bt-voltar');
     await pg.click('[data-grupo="Peito"]');
@@ -123,7 +123,7 @@ async function novaPagina(browser, base, dados) {
       'carga.prefs': { contagem: 0 },
     });
     ok((await pg.textContent('#card-dia .titulo')).includes('Puxar'), 'sugere Puxar');
-    const plano = await pg.evaluate(() => { const it = planoTreino(TREINOS[1], diasPorTreino()).itens; return { ids: it.join(), tri: it.some(id => musculoDe(exMap[id]) === 'triceps'), bi: it.some(id => musculoDe(exMap[id]) === 'biceps') }; });
+    const plano = await pg.evaluate(() => { const it = planoTreino(TREINOS[1], diasPorTreino()).itens; return { ids: it.join(), tri: it.some(id => exMap[id].pri === 'triceps'), bi: it.some(id => exMap[id].pri === 'biceps') }; });
     ok(!plano.tri && plano.bi, 'plano de Puxar sem tríceps e com bíceps: ' + plano.ids);
     ok(await pg.locator('.grupo.sugerido[data-grupo="Braços"]').count() === 1, 'Braços entra no treino de Puxar pelo bíceps');
     await pg.click('#bt-comecar');
@@ -173,6 +173,76 @@ async function novaPagina(browser, base, dados) {
     ok(!pg.erros.length, 'sem erros de página (unilateral) ' + pg.erros.join(' | '));
   }
 
+  // 4b) classificação, rotinas A/B e volume semanal
+  {
+    const pg = await novaPagina(browser, base, {});
+    const r = await pg.evaluate(() => {
+      const semPri = movs.filter(m => !exMap[m.vars[0].id].pri).map(m => m.id);
+      const erradas = [], repetidos = [], foraMeta = [];
+      const vol = Object.fromEntries(ALVOS_VOL.map(a => [a.id, 0]));
+      const SO_UM = ['elevacao_lateral', 'flexora', 'panturrilha']; // músculo com um só movimento: repete, em outra variação
+      for (const t of TREINOS) {
+        const A = ROTINAS_PPL[t.id].A.itens.map(([id]) => id), B = ROTINAS_PPL[t.id].B.itens.map(([id]) => id);
+        for (const [v, ids] of [['A', A], ['B', B]]) {
+          for (const id of ids) if (!exNoTreino(exMap[id], t)) erradas.push(`${t.id} ${v}: ${id}`);
+          const ms = ids.map(id => exMap[id].mov);
+          if (new Set(ms).size !== ms.length) repetidos.push(`${t.id} ${v} repete movimento`);
+        }
+        for (const id of A) {
+          const b = B.find(x => exMap[x].mov === exMap[id].mov);
+          if (b && (!SO_UM.includes(exMap[id].mov) || b === id)) repetidos.push(`${t.id}: ${id} no A e ${b} no B`);
+        }
+        for (const v of ['A', 'B']) for (const [id, , n] of ROTINAS_PPL[t.id][v].itens) {
+          const e = exMap[id]; vol[e.pri] += n; e.aux.forEach(a => { vol[a] += n / 2; });
+        }
+      }
+      for (const a of ALVOS_VOL) if (a.meta && (vol[a.id] < a.meta[0] || vol[a.id] > a.meta[1])) foraMeta.push(`${a.id} ${vol[a.id]} (${a.meta})`);
+      return { semPri, erradas, repetidos, foraMeta, vol,
+        face: exMap.face_pull.treino, inverso: exMap.crucifixo_inverso.treino, terra: exMap.levantamento_terra.treino, hiper: exMap.hiperextensao.treino,
+        lateralEmpurrar: exNoTreino(exMap.elevacao_lateral, TREINOS[0]), lateralPuxar: exNoTreino(exMap.elevacao_lateral, TREINOS[1]) };
+    });
+    ok(!r.semPri.length, 'todo movimento tem músculo principal ' + r.semPri.join());
+    ok(r.face === 'puxar' && r.inverso === 'puxar' && r.terra === 'pernas' && r.hiper === 'pernas', 'face pull e crucifixo inverso são de Puxar; terra e hiperextensão são de Pernas');
+    ok(r.lateralEmpurrar && !r.lateralPuxar, 'elevação lateral só cabe no Empurrar');
+    ok(!r.erradas.length, 'nenhum exercício das rotinas em treino errado ' + r.erradas.join(' | '));
+    ok(!r.repetidos.length, 'nada repetido nas rotinas (só lateral, flexora e panturrilha em outra variação) ' + r.repetidos.join(' | '));
+    ok(!r.foraMeta.length, 'A + B somam o volume da meta em cada músculo ' + r.foraMeta.join(' | '));
+    ok(!pg.erros.length, 'sem erros de página (rotinas) ' + pg.erros.join(' | '));
+  }
+
+  // 4c) Empurrar A com preparatórias: contam à parte, sem recorde, e a carga de trabalho volta depois
+  {
+    const pg = await novaPagina(browser, base, {
+      'carga.logs': [{ id: 1, ex: 'supino_reto', ts: agora - 4 * D, sets: [{ peso: 60, reps: 10, ts: agora - 4 * D }] }],
+      'carga.prefs': { contagem: 0 },
+    });
+    await pg.evaluate(() => localStorage.setItem('carga.treinoDia', JSON.stringify({ dia: hojeKey(), id: 'empurrar', v: 'A' })));
+    await pg.reload();
+    await pg.waitForTimeout(300);
+    ok((await pg.textContent('#plano-versao')).includes('Empurrar A'), 'card do dia mostra a versão da rotina');
+    ok((await pg.textContent('#card-dia')).includes('3 prep. + 4 séries'), 'plano mostra preparatórias e séries de trabalho');
+    await pg.click('#bt-comecar');
+    await pg.waitForTimeout(200);
+    ok(await pg.evaluate(() => ativo.ex === 'supino_reto'), 'começa pelo supino reto');
+    ok((await pg.textContent('#dock-rot')).includes('Preparatória 1 de 3') && await pg.evaluate(() => form.prep && form.peso === 30 && form.reps === 10), 'primeira é preparatória, com 50% da carga de trabalho');
+    for (let i = 0; i < 3; i++) {
+      await pg.click('#bt-sem-crono');
+      await pg.click('#bt-salvar-serie');
+      await pg.click('#bt-minimizar');
+    }
+    const st = await pg.evaluate(() => ({ sets: logHoje('supino_reto').sets, peso: form.peso, prep: form.prep, d: dicaCarga('supino_reto'), v: contaVolume(Date.now() - 864e5).peito }));
+    ok(st.sets.length === 3 && st.sets.every(s => s.prep && !s.pr) && st.sets.map(s => s.peso).join() === '30,42.5,50', 'três preparatórias (50, 70 e 85%) salvas, nenhuma como recorde: ' + st.sets.map(s => s.peso).join());
+    ok((await pg.textContent('#dock-rot')).includes('Série 1 de 4') && !st.prep && st.peso === 60, 'depois delas vem a série 1 de trabalho com a carga alvo');
+    ok(st.v.trab === 0 && st.v.prep === 3, 'preparatórias contam à parte no volume ' + JSON.stringify(st.v));
+    await pg.click('#bt-prep');
+    ok(await pg.evaluate(() => form.prep), 'dá para marcar uma série como preparatória');
+    await pg.click('#bt-prep');
+    await pg.click('#bt-sem-crono');
+    await pg.click('#bt-salvar-serie');
+    ok(await pg.evaluate(() => { const s = logHoje('supino_reto').sets; return !s[3].prep && contaVolume(Date.now() - 864e5).peito.trab === 1 && contaVolume(Date.now() - 864e5).triceps.trab === 0.5; }), 'série de trabalho conta 1 no principal e ½ no auxiliar');
+    ok(!pg.erros.length, 'sem erros de página (preparatórias) ' + pg.erros.join(' | '));
+  }
+
   // 5) evolução por grupo, volume por músculo, abas e backup
   {
     const pg = await novaPagina(browser, base, {
@@ -180,7 +250,7 @@ async function novaPagina(browser, base, dados) {
     });
     await pg.click('nav [data-tab="progresso"]');
     await pg.click('[data-pg="Ombros"]');
-    ok(await pg.locator('.vm').count() === 1, 'volume por músculo do grupo');
+    ok(await pg.locator('.vm').count() === 3, 'volume por músculo do grupo (ombro em três partes)');
     await pg.click('[data-evo="elevacao_lateral"]');
     ok(await pg.locator('.evo-det .grafico svg').count() === 2, 'detalhe com gráficos');
     await pg.click('nav [data-tab="musculos"]');

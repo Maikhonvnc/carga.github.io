@@ -279,17 +279,27 @@ function escolherDescanso(ex) {
   } })));
 }
 
-function preencheForm(ex) {
-  const l = logHoje(ex.id);
-  form = { ex: ex.id, rir: null, peso: 20, reps: 10 };
-  if (l && l.sets.length) { // continua de onde parou hoje
-    const u = l.sets[l.sets.length - 1];
+// prep: força preparatória (true) ou de trabalho (false); sem ele, faz as preparatórias do plano do dia antes das de trabalho
+function preencheForm(ex, prep) {
+  const l = logHoje(ex.id), sets = l ? l.sets : [], t = trab(sets), p = preps(sets);
+  const pl = planoDoExercicio(ex.id);
+  const prepFalta = pl && pl.prep && !t.length ? pl.prep - p.length : 0;
+  form = { ex: ex.id, rir: null, peso: 20, reps: 10, prep: prep ?? prepFalta > 0 };
+  const d = dicaCarga(ex.id);
+  const alvoPeso = d ? d.alvoPeso : ex.corpo ? 0 : 20;
+  const alvoReps = d ? d.alvoReps : ex.seg ? 30 : Math.round((ex.faixa[0] + ex.faixa[1]) / 2);
+  if (form.prep) { // carga em % da de trabalho (PREP_ESQUEMA)
+    const esq = PREP_ESQUEMA[Math.min(3, Math.max(1, (pl && pl.prep) || 1))];
+    const [f, r] = esq[Math.min(p.length, esq.length - 1)];
+    form.peso = alvoPeso > 0 ? Math.max(0, +(Math.round(alvoPeso * f / ex.inc) * ex.inc).toFixed(2)) : alvoPeso;
+    form.reps = ex.seg ? Math.round(alvoReps / 2) : r;
+  } else if (t.length) { // continua de onde parou hoje
+    const u = t[t.length - 1];
     form.peso = u.peso; form.reps = u.reps;
     if (u.repsE != null) { form.repsE = u.repsE; form.repsD = u.repsD; }
   } else {
-    const d = dicaCarga(ex.id);
-    form.peso = d ? d.alvoPeso : ex.corpo ? 0 : 20;
-    form.reps = d ? d.alvoReps : ex.seg ? 30 : Math.round((ex.faixa[0] + ex.faixa[1]) / 2);
+    form.peso = alvoPeso;
+    form.reps = alvoReps;
   }
   form.repsE ??= form.reps; form.repsD ??= form.reps;
   if (ativo.estado === 'anotando' && ativo.pend && ativo.pend.dur && ex.seg) form.reps = form.repsE = form.repsD = ativo.pend.dur;
@@ -298,10 +308,11 @@ function preencheForm(ex) {
 // dica de progressão (progressão dupla: sobe reps até o teto da faixa, depois sobe carga)
 function dicaCarga(exId) {
   const hoje = hojeKey();
-  const ant = logs.filter(l => l.ex === exId && l.sets.length && dayKey(l.ts) !== hoje);
+  const ant = logs.filter(l => l.ex === exId && trab(l.sets).length && dayKey(l.ts) !== hoje);
   if (!ant.length) return null;
   const ex = exMap[exId];
-  const u = ant.reduce((a, b) => b.ts > a.ts ? b : a);
+  const ul = ant.reduce((a, b) => b.ts > a.ts ? b : a);
+  const u = { ...ul, sets: trab(ul.sets) }; // a progressão olha só as séries de trabalho
   const top = melhorSerie(u.sets);
   const [lo, hi] = ex ? ex.faixa : [8, 12];
   const inc = ex ? ex.inc : 2.5;
@@ -439,7 +450,8 @@ function itemSerie(ex, sets, i) {
   }
   if (s.rir != null) det.push(`<span class="rir r${Math.min(s.rir, 4)}">${rirTxt(s.rir)}</span>`);
   if (s.desc) det.push(`descanso ${mmss(s.desc)}`);
-  return `<div class="serie"><span class="n">${i + 1}</span>
+  if (s.prep) det.unshift('preparatória');
+  return `<div class="serie${s.prep ? ' prep' : ''}"><span class="n">${s.prep ? 'P' : trab(sets.slice(0, i + 1)).length}</span>
     <div class="info"><div class="nome">${esc(carga(s.peso))} × ${esc(repsTxt(s, ex.seg))}${s.pr ? `<span class="badge-pr">${ic('trophy-fill')}PR</span>` : ''}</div>
     ${det.length ? `<div class="det">${det.join(' · ')}</div>` : ''}</div>
     <button class="btn-ic" data-editar="${i}" aria-label="Editar série ${i + 1}">${ic('pencil-simple', 'ic-18')}</button>

@@ -12,34 +12,39 @@ const TREINOS = [
 const CORE = REGIOES.find(r => r.id === 'core').musculos; // fora do rodízio: entra em qualquer treino
 // grupo da tela inicial que tem algum músculo principal do treino (Braços entra em Empurrar pelo tríceps e em Puxar pelo bíceps)
 const grupoNoTreino = (g, t) => g.musculos.some(m => t.principais.includes(m));
-// músculo que mais trabalha no exercício
-const musculoDe = e => Object.keys(e.musculos || {}).reduce((a, m) => (!a || e.musculos[m] > e.musculos[a] ? m : a), null);
-// exercício que cabe no treino: o músculo principal é do treino (ou do core). Tríceps não é de Puxar.
-const exNoTreino = (e, t) => { const m = musculoDe(e); return !m || t.musculos.includes(m) || CORE.includes(m); };
+// exercício que cabe no treino: o treino do músculo principal (data.js, CLASSIFICA), ou core, que entra em qualquer um.
+// Face pull e crucifixo inverso (deltoide posterior) são de Puxar; terra e hiperextensão são de Pernas.
+// (aceita também um movimento: vale o da 1ª variação)
+const exNoTreino = (e, t) => { const x = e && e.vars ? exMap[e.vars[0].id] : e; return !x || !x.treino || x.treino === t.id || x.treino === 'core'; };
 // treino que a tela inicial está mostrando no card do dia (null = descanso ou primeiro uso)
 let treinoDoCard = null;
 let treinoEscolha = null; // treino que o usuário tocou para ver no lugar do sugerido (vale até recarregar)
 
 // treino do dia: fica escolhido do momento em que começa até o dia acabar (sobrevive a recarregar e a voltar para o início)
 const LS_TREINO_DIA = 'carga.treinoDia';
-function treinoFixo() {
+function lerTreinoDia() {
   const d = lerLS(LS_TREINO_DIA, null);
-  return d && d.dia === hojeKey() ? TREINOS.find(t => t.id === d.id) || null : null;
+  return d && d.dia === hojeKey() ? d : null;
 }
-function fixaTreino(t) {
-  if (t) localStorage.setItem(LS_TREINO_DIA, JSON.stringify({ dia: hojeKey(), id: t.id }));
+function treinoFixo() {
+  const d = lerTreinoDia();
+  return d ? TREINOS.find(t => t.id === d.id) || null : null;
+}
+// guarda o treino e a versão (A/B) de hoje
+function fixaTreino(t, v) {
+  if (!t) return;
+  const d = lerTreinoDia();
+  v ||= d && d.id === t.id ? d.v : null;
+  localStorage.setItem(LS_TREINO_DIA, JSON.stringify({ dia: hojeKey(), id: t.id, ...(v ? { v } : {}) }));
 }
 // treino de hoje para quem está fora da tela inicial (lista do grupo, próximo exercício)
 const treinoDeHoje = () => treinoFixo() || treinoDoCard;
 
-// treino de um dia: o que mais recebeu séries (cada série pesa a fração do músculo no exercício); só core = nenhum
+// treino de um dia: o que mais recebeu séries de trabalho pelo treino de cada exercício; só core = nenhum
 function treinoDoDia(doDia) {
   let melhor = null, max = 0;
   for (const t of TREINOS) {
-    const s = doDia.reduce((a, l) => {
-      const e = exMap[l.ex];
-      return e ? a + l.sets.length * t.musculos.reduce((b, m) => b + (e.musculos[m] || 0), 0) : a;
-    }, 0);
+    const s = doDia.reduce((a, l) => { const e = exMap[l.ex]; return e && e.treino === t.id ? a + trab(l.sets).length : a; }, 0);
     if (s > max) { max = s; melhor = t; }
   }
   return melhor;
@@ -58,47 +63,53 @@ function diasPorTreino() {
   return res;
 }
 
-// candidatos para um músculo: um por movimento (a variação usada por último), do mais usado recentemente ao menos
-function candidatosMusculo(m, ultimoUso, minimo = 0.5) {
-  const porMov = {};
-  for (const e of EXERCICIOS) {
-    if ((e.musculos[m] || 0) < minimo || e.custom) continue;
-    const atual = porMov[e.mov];
-    if (!atual || (ultimoUso[e.id] || 0) > (ultimoUso[atual.id] || 0)) porMov[e.mov] = e;
-  }
-  return Object.values(porMov).sort((a, b) => (ultimoUso[b.id] || 0) - (ultimoUso[a.id] || 0));
+// ---------- rotinas A/B ----------
+const outraVersao = v => (v === 'A' ? 'B' : 'A');
+// versão de um dia já feito: a rotina com mais movimentos em comum com ele
+function versaoDoDia(t, dia) {
+  const movsDia = new Set(dia.logs.map(l => exMap[l.ex] && exMap[l.ex].mov));
+  const comum = v => ROTINAS_PPL[t.id][v].itens.filter(([id]) => exMap[id] && movsDia.has(exMap[id].mov)).length;
+  return comum('B') > comum('A') ? 'B' : 'A';
 }
-// o músculo já tem exercício no plano: é o principal de algum item ou trabalha bastante nele
-const musculoCoberto = (m, itens) => itens.some(id => { const e = exMap[id]; return e && (musculoDe(e) === m || (e.musculos[m] || 0) >= 0.3); });
+// versão de hoje: a guardada ao começar; senão a que não foi feita da última vez (sem histórico, A)
+function versaoTreino(t, dias) {
+  const d = lerTreinoDia();
+  if (d && d.id === t.id && d.v) return d.v;
+  const ant = (dias[t.id] || []).find(x => x.dia !== hojeKey());
+  return ant ? outraVersao(versaoDoDia(t, ant)) : 'A';
+}
 
-// plano: repete o último dia deste treino (exercícios na ordem feita, mesmo nº de séries), sem os exercícios
-// de outro treino (ex.: tríceps num dia de Puxar) e com um exercício a mais para cada músculo principal que ficou de fora;
-// sem histórico, monta 5 exercícios pelos músculos do treino
+// plano: a rotina da versão de hoje, com preparatórias e séries de trabalho. Se da última vez nesta versão
+// você fez outra variação do mesmo movimento, ou trocou o exercício por outro do mesmo músculo principal, a troca fica.
 function planoTreino(t, dias) {
-  const hoje = hojeKey();
-  const ultimoUso = {};
-  logs.forEach(l => { ultimoUso[l.ex] = Math.max(ultimoUso[l.ex] || 0, l.ts); });
-  const ant = (dias[t.id] || []).find(d => d.dia !== hoje);
-  if (ant) {
-    const itens = [...new Set(ant.logs.map(l => l.ex))].filter(id => exMap[id] && exNoTreino(exMap[id], t));
-    const series = {};
-    for (const l of ant.logs) series[l.ex] = (series[l.ex] || 0) + l.sets.length;
-    if (itens.length) {
-      const movs_ = new Set(itens.map(id => exMap[id].mov));
-      for (const m of t.principais) {
-        if (musculoCoberto(m, itens)) continue;
-        const e = candidatosMusculo(m, ultimoUso).find(x => !movs_.has(x.mov) && musculoDe(x) === m);
-        if (e) { itens.push(e.id); movs_.add(e.mov); }
-      }
-      return { ts: ant.logs[0].ts, itens, series };
+  const v = versaoTreino(t, dias), rot = ROTINAS_PPL[t.id][v];
+  const ultMesma = (dias[t.id] || []).find(x => x.dia !== hojeKey() && versaoDoDia(t, x) === v);
+  const feitosAnt = ultMesma ? [...new Set(ultMesma.logs.map(l => l.ex))].filter(id => exMap[id]) : [];
+  const naRotina = new Set(rot.itens.map(([id]) => id));
+  const usados = new Set();
+  const itens = [], series = {}, prep = {};
+  for (const [id0, p, n] of rot.itens) {
+    const base = exMap[id0];
+    if (!base) continue;
+    let id = id0;
+    if (feitosAnt.length && !feitosAnt.includes(id0)) {
+      const mesmoMov = feitosAnt.find(x => exMap[x].mov === base.mov);
+      const troca = mesmoMov || feitosAnt.find(x => !naRotina.has(x) && !usados.has(x) && exMap[x].pri === base.pri && exMap[x].mov !== base.mov
+        && !rot.itens.some(([r]) => exMap[r] && exMap[r].mov === exMap[x].mov));
+      if (troca) id = troca;
     }
+    if (usados.has(id)) continue;
+    usados.add(id);
+    itens.push(id); series[id] = n; prep[id] = p;
   }
-  const itens = [], usados = new Set();
-  t.musculos.forEach((m, i) => {
-    const cands = candidatosMusculo(m, ultimoUso).filter(e => !usados.has(e.mov));
-    for (const e of cands.slice(0, i < 2 ? 2 : 1)) if (itens.length < 5) { itens.push(e.id); usados.add(e.mov); }
-  });
-  return { ts: 0, itens, series: {} };
+  return { ts: ultMesma ? ultMesma.logs[0].ts : 0, itens, series, prep, v, foco: rot.foco };
+}
+// plano de hoje para um exercício (preparatórias e séries de trabalho), se ele está no treino do dia
+function planoDoExercicio(exId) {
+  const t = treinoFixo();
+  if (!t) return null;
+  const pl = planoTreino(t, diasPorTreino());
+  return pl.itens.includes(exId) ? { prep: pl.prep[exId] || 0, trab: pl.series[exId] || 3 } : null;
 }
 
 // exercícios do card do dia: o plano e, com o treino em andamento, também o que já foi feito hoje fora do plano
@@ -156,7 +167,7 @@ function alvoTxt(exId) {
 
 function comecarTreino(t, itens) {
   if (!itens.length) return toast('Escolha um grupo abaixo para montar o treino.');
-  fixaTreino(t);
+  fixaTreino(t, versaoTreino(t, diasPorTreino()));
   const feitos = new Set(logs.filter(l => dayKey(l.ts) === hojeKey()).map(l => l.ex));
   ativo.rotina = 'rep';
   ativo.rotinaTemp = { id: 'rep', nome: t.nome, itens };
@@ -188,12 +199,17 @@ function renderHero(el, e) {
   const andamento = e.hoje || treinoFixo() === t;
   const itens = itensDoDia(t, plano, andamento);
   const nFeitos = itens.filter(id => feitos.has(id)).length;
-  const setsHoje = id => doDia.filter(l => l.ex === id).reduce((s, l) => s + l.sets.length, 0);
+  const setsHoje = id => doDia.filter(l => l.ex === id).reduce((s, l) => s + trab(l.sets).length, 0);
+  const prepHoje = id => doDia.filter(l => l.ex === id).reduce((s, l) => s + preps(l.sets).length, 0);
+  // "1 prep. + 3 séries": preparatórias e de trabalho previstas para o exercício
+  const seriesTxt = id => plano.series[id] ? `<small class="plano-series">${plano.prep[id] ? `${plano.prep[id]} prep. + ` : ''}${plural(plano.series[id], 'série', 'séries')}</small>` : '';
+  const feitoTxt = id => `${plural(setsHoje(id), 'série', 'séries')}${prepHoje(id) ? ` + ${prepHoje(id)} prep.` : ''}`;
   const linhas = itens.map((id, i) => feitos.has(id)
-    ? `<div class="plano-it feito"><span class="n">${ic('check-circle-fill')}</span><span class="nome">${nomeEx(id)}</span><span class="alvo">${plural(setsHoje(id), 'série', 'séries')}</span></div>`
-    : `<div class="plano-it"><span class="n">${i + 1}</span><span class="nome">${nomeEx(id)}</span><span class="alvo">${esc(alvoTxt(id))}</span></div>`).join('');
+    ? `<div class="plano-it feito"><span class="n">${ic('check-circle-fill')}</span><span class="nome">${nomeEx(id)}</span><span class="alvo">${feitoTxt(id)}</span></div>`
+    : `<div class="plano-it"><span class="n">${i + 1}</span><span class="nome">${nomeEx(id)}${seriesTxt(id)}</span><span class="alvo">${esc(alvoTxt(id))}</span></div>`).join('');
   const nSeries = itens.reduce((s, id) => s + (plano.series[id] || 3), 0);
-  const min = Math.max(5, Math.round(itens.reduce((s, id) => s + (plano.series[id] || 3) * (40 + descansoDe(id)), 0) / 60 / 5) * 5);
+  const nPrep = itens.reduce((s, id) => s + (plano.prep[id] || 0), 0);
+  const min = Math.max(5, Math.round(itens.reduce((s, id) => s + (plano.series[id] || 3) * (40 + descansoDe(id)) + (plano.prep[id] || 0) * 80, 0) / 60 / 5) * 5);
   const prox = itens.find(id => !feitos.has(id));
 
   let txt, acao;
@@ -209,12 +225,12 @@ function renderHero(el, e) {
       <div class="ink2">${esc(t.det)}</div>
       <div class="hero-meta">${rec}<span class="mudo">${e.ultTs ? `último: ${dataCurta(e.ultTs)}` : 'primeira vez'}</span></div>`;
     acao = `<button class="grande larga" id="bt-comecar">${ic('play-fill')}Começar ${esc(t.nome)}</button>
-      <div class="hero-rod">${plural(itens.length, 'exercício', 'exercícios')} · ${nSeries} séries · cerca de ${min} min</div>`;
+      <div class="hero-rod">${plural(itens.length, 'exercício', 'exercícios')} · ${nSeries} séries${nPrep ? ` + ${nPrep} prep.` : ''} · cerca de ${min} min</div>`;
   }
   el.innerHTML = `<div class="card hero" id="card-dia">
     <div class="hero-top"><div class="hero-txt">${txt}</div><span class="hero-corpo">${corpoMini(t.musculos)}</span></div>
     ${andamento ? tilesHoje() : ''}
-    <div class="plano"><div class="plano-cab"><span>${plano.ts ? `Plano · repete ${dataCurta(plano.ts)}` : 'Plano sugerido'}</span><span>${andamento ? 'hoje' : 'alvo de hoje'}</span></div>${linhas}</div>
+    <div class="plano"><div class="plano-cab"><span id="plano-versao">${esc(t.nome)} ${plano.v} · ${esc(plano.foco)}</span><span>${andamento ? 'hoje' : 'alvo de hoje'}</span></div>${linhas}</div>
     <div class="hero-acao">${acao}</div></div>`;
   const bt = $('bt-comecar');
   if (bt) bt.onclick = () => comecarTreino(t, itens);
@@ -222,7 +238,7 @@ function renderHero(el, e) {
 const escolhidoOuSug = e => (treinoEscolha === e.t.id && e.pct < 60 ? 'Treinar mesmo assim' : 'Hoje é dia de');
 
 function tilesHoje() {
-  const sets = logs.filter(l => dayKey(l.ts) === hojeKey()).flatMap(l => l.sets);
+  const sets = logs.filter(l => dayKey(l.ts) === hojeKey()).flatMap(l => l.sets), nPrep = preps(sets).length;
   const vol = sets.reduce((s, x) => s + x.peso * x.reps, 0);
   let duracao = '–';
   if (sets.length > 1) {
@@ -230,7 +246,7 @@ function tilesHoje() {
     const min = Math.round((fim - ini) / 6e4);
     duracao = min >= 60 ? `${Math.floor(min / 60)}h${String(min % 60).padStart(2, '0')}` : `${Math.max(1, min)} <small>min</small>`;
   }
-  return `<div class="tiles" id="tiles-hoje">${tile(sets.length, 'séries')}${tile(`${kg(vol)} <small>kg</small>`, 'volume')}${tile(duracao, 'duração')}</div>`;
+  return `<div class="tiles" id="tiles-hoje">${tile(sets.length - nPrep, nPrep ? `séries + ${nPrep} prep.` : 'séries')}${tile(`${kg(vol)} <small>kg</small>`, 'volume')}${tile(duracao, 'duração')}</div>`;
 }
 
 function renderOutros(outros) {

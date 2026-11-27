@@ -116,6 +116,23 @@ function mostraChipMarcado(fila) {
 }
 const infoTipoEq = ex => TIPOS_EQ.find(t => t.id === tipoEq(ex));
 
+// principal, auxiliares e treino (empurrar/puxar/pernas/core) de uma variação: da tabela CLASSIFICA (data.js);
+// exercício personalizado sem classificação usa o músculo que mais trabalha (ombro conta como deltoide lateral)
+const alvoMap = Object.fromEntries(ALVOS_VOL.map(a => [a.id, a]));
+function classificacao(varId, m) {
+  let c = CLASSIFICA[varId] || CLASSIFICA[m.id];
+  if (!c) {
+    const ms = Object.keys(m.musculos || {}).sort((a, b) => m.musculos[b] - m.musculos[a]);
+    const alvo = x => (x === 'ombros' ? 'delt_lat' : x);
+    c = ms.length ? [alvo(ms[0]), ...ms.slice(1).filter(x => m.musculos[x] >= 0.15).map(alvo)] : [];
+  }
+  const pri = c[0] || null;
+  return { pri, aux: c.slice(1), treino: pri && alvoMap[pri] ? alvoMap[pri].treino : null };
+}
+// séries de trabalho e preparatórias (a preparatória fica marcada com prep: true)
+const trab = sets => sets.filter(s => !s.prep);
+const preps = sets => sets.filter(s => s.prep);
+
 function montaCatalogo() {
   movs = MOVIMENTOS.map(m => ({ ...m, vars: m.vars.slice() }));
   // personalizados: {cat, nome, musculos} = exercício novo; {mov, vnome} = variação de um movimento existente
@@ -136,6 +153,7 @@ function montaCatalogo() {
     inc: v.inc || INC_EQ[v.eq] || 2.5, corpo: v.eq === 'corpo', seg: !!m.seg, uni: !!v.uni,
     faixa: m.faixa || [8, 12], desc: m.desc || (m.tipo === 'composto' ? 120 : 75),
     custom: !!v.custom,
+    ...classificacao(v.id, m),
   })));
   exMap = Object.fromEntries(EXERCICIOS.map(e => [e.id, e]));
 }
@@ -185,7 +203,7 @@ function estimulo(l, muscId) {
   return frac * l.sets.reduce((t, s) => {
     const e = e1rm(s.peso, s.reps);
     const int = best && e ? Math.min(1, Math.max(0.5, e / best)) : 1;
-    return t + int * fatorEsforco(s.rir);
+    return t + int * fatorEsforco(s.rir) * (s.prep ? 0.3 : 1); // preparatória cansa pouco
   }, 0);
 }
 
