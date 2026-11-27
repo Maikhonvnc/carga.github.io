@@ -245,24 +245,31 @@ function ladoFraco(sets) {
   return `<p class="mudo">Lado mais fraco: <b class="c-atencao">${dif < 0 ? 'esquerdo' : 'direito'}</b> (${num(Math.abs(+dif.toFixed(1)))} rep a menos em média) — comece pelo lado mais fraco e iguale as reps do outro.</p>`;
 }
 
-// séries efetivas por músculo nos últimos 7 dias × faixa de referência para hipertrofia (10–20/semana)
-// série direta (músculo ≥ 40% do exercício) conta 1; indireta (15–40%) conta ½
-const FAIXA_SEMANAL = [10, 20];
+// volume dos últimos 7 dias por músculo × meta semanal (ALVOS_VOL, data.js). Série de trabalho vale 1 no músculo
+// principal do exercício e ½ em cada auxiliar; as preparatórias contam à parte, no músculo principal.
+function contaVolume(desde, ate = Infinity) {
+  const cont = Object.fromEntries(ALVOS_VOL.map(a => [a.id, { trab: 0, prep: 0 }]));
+  for (const l of logs) {
+    const e = exMap[l.ex];
+    if (l.ts < desde || l.ts >= ate || !e || !e.pri || !cont[e.pri]) continue;
+    const t = trab(l.sets).length;
+    cont[e.pri].trab += t;
+    cont[e.pri].prep += l.sets.length - t;
+    for (const a of e.aux) if (cont[a]) cont[a].trab += t / 2;
+  }
+  return cont;
+}
 function volumeMusculos(grupo) {
   const g = gruposVisiveis().find(x => x.id === grupo);
-  const lista = g ? g.musculos : MUSCULOS.map(m => m.id);
-  const desde = Date.now() - 7 * 864e5, cont = Object.fromEntries(lista.map(m => [m, 0]));
-  for (const l of logs) {
-    if (l.ts < desde || !exMap[l.ex]) continue;
-    for (const [m, f] of Object.entries(exMap[l.ex].musculos)) if (m in cont) cont[m] += l.sets.length * (f >= 0.4 ? 1 : f >= 0.15 ? 0.5 : 0);
-  }
-  const [lo, hi] = FAIXA_SEMANAL, max = 26, pct = v => Math.min(100, v / max * 100);
-  return `<div class="card card-graf"><div class="card-cab"><h3>Séries por músculo · 7 dias</h3><div class="mudo">Faixa verde = ${lo}–${hi} séries/semana (hipertrofia). Séries em que o músculo só ajuda contam ½.</div></div>
-    <div class="vm-lista">${lista.map(m => {
-      const v = Math.round(cont[m] * 2) / 2;
-      const [cor, st] = v < lo ? ['var(--atencao)', 'abaixo'] : v <= hi ? ['var(--ok)', 'na faixa'] : ['var(--serio)', 'acima'];
-      return `<div class="vm"><span class="vm-nome">${esc(nomeCurto(m))}</span>
-        <div class="vm-barra"><div class="vm-faixa" style="left:${pct(lo)}%;width:${pct(hi) - pct(lo)}%"></div><div class="vm-val" style="width:${pct(v)}%;background:${cor}"></div></div>
-        <span class="vm-num">${num(v)}</span><span class="vm-st" style="color:${cor}">${st}</span></div>`;
+  const lista = ALVOS_VOL.filter(a => !g || g.musculos.includes(a.m));
+  const cont = contaVolume(Date.now() - 7 * 864e5);
+  const max = 24, pct = v => Math.min(100, v / max * 100);
+  return `<div class="card card-graf" id="volume-semana"><div class="card-cab"><h3>Volume da semana · 7 dias</h3><div class="mudo">Séries de trabalho por músculo. Faixa verde = meta da semana. Quando o músculo só ajuda, a série conta ½. Preparatórias aparecem à parte e não entram na meta.</div></div>
+    <div class="vm-lista">${lista.map(a => {
+      const c = cont[a.id], v = Math.round(c.trab * 2) / 2;
+      const [cor, st] = !a.meta ? ['var(--t-3)', 'auxiliar'] : v < a.meta[0] ? ['var(--atencao)', 'abaixo'] : v <= a.meta[1] ? ['var(--ok)', 'na meta'] : ['var(--serio)', 'acima'];
+      return `<div class="vm" data-alvo="${a.id}"><span class="vm-nome">${esc(a.nome)}${c.prep ? `<small class="vm-prep">+${c.prep} prep.</small>` : ''}</span>
+        <div class="vm-barra">${a.meta ? `<div class="vm-faixa" style="left:${pct(a.meta[0])}%;width:${pct(a.meta[1]) - pct(a.meta[0])}%"></div>` : ''}<div class="vm-val" style="width:${pct(v)}%;background:${cor}"></div></div>
+        <span class="vm-num">${num(v)}${a.meta ? `<small>/${a.meta[0]}</small>` : ''}</span><span class="vm-st" style="color:${cor}">${st}</span></div>`;
     }).join('')}</div></div>`;
 }

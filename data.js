@@ -282,9 +282,9 @@ const MOVIMENTOS = [
       'Suba sem travar os cotovelos com impacto',
     ],
     vars: [
-      { id: 'paralelas', nome: 'Paralelas', fe: 'Dips_-_Chest_Version', eq: 'corpo', musculos: { peito: .45, triceps: .40, ombros: .15 } },
+      { id: 'paralelas', nome: 'Paralelas', fe: 'Dips_-_Chest_Version', eq: 'corpo', ap: 'paralela', musculos: { peito: .45, triceps: .40, ombros: .15 } },
       { id: 'paralelas_maq', nome: 'Máquina (sentado)', fe: 'Dip_Machine', eq: 'maquina', img: null },
-      { id: 'paralelas_banco', nome: 'No banco', fe: 'Bench_Dips', foco: ['delt_ant'], eq: 'corpo', img: null, musculos: { triceps: .70, peito: .15, ombros: .15 },
+      { id: 'paralelas_banco', nome: 'No banco', fe: 'Bench_Dips', foco: ['delt_ant'], eq: 'corpo', ap: 'banco', img: null, musculos: { triceps: .70, peito: .15, ombros: .15 },
         dica: 'Mãos no banco atrás do corpo e costas rente ao banco' },
     ] },
   { id: 'pullover', cat: 'Peito', nome: 'Pullover', tipo: 'isolado', foco: ['dorsal', 'peito_med'], anim: 'press', img: 'pullover',
@@ -325,9 +325,9 @@ const MOVIMENTOS = [
       'Desça controlando até estender os braços',
     ],
     vars: [
-      { id: 'barra_fixa', nome: 'Pronada', fe: 'Pullups', eq: 'corpo' },
-      { id: 'barra_fixa_supinada', nome: 'Supinada', fe: 'Chin-Up', eq: 'corpo', musculos: { costas: .45, biceps: .35, ombros: .10, antebraco: .05, abdomen: .05 } },
-      { id: 'barra_fixa_neutra', nome: 'Neutra', fe: 'V-Bar_Pullup', eq: 'corpo' },
+      { id: 'barra_fixa', nome: 'Pronada', fe: 'Pullups', eq: 'corpo', ap: 'barra_fixa' },
+      { id: 'barra_fixa_supinada', nome: 'Supinada', fe: 'Chin-Up', eq: 'corpo', ap: 'barra_fixa', musculos: { costas: .45, biceps: .35, ombros: .10, antebraco: .05, abdomen: .05 } },
+      { id: 'barra_fixa_neutra', nome: 'Neutra', fe: 'V-Bar_Pullup', eq: 'corpo', ap: 'barra_fixa' },
     ] },
   { id: 'remada_curvada', cat: 'Costas', sub: 'Dorsais', nome: 'Remada curvada', tipo: 'composto', foco: ['meio_costas', 'dorsal'], anim: 'remada', img: 'remada_curvada',
     musculos: { costas: .50, biceps: .20, trapezio: .10, ombros: .10, lombar: .10 },
@@ -403,8 +403,8 @@ const MOVIMENTOS = [
       'Sem embalo',
     ],
     vars: [
-      { id: 'hiperextensao', nome: 'Banco 45°', fe: 'Hyperextensions_Back_Extensions', eq: 'corpo' },
-      { id: 'hiperextensao_90', nome: 'Banco romano (90°)', eq: 'corpo' },
+      { id: 'hiperextensao', nome: 'Banco 45°', fe: 'Hyperextensions_Back_Extensions', eq: 'corpo', ap: 'banco' },
+      { id: 'hiperextensao_90', nome: 'Banco romano (90°)', eq: 'corpo', ap: 'banco' },
     ] },
   { id: 'encolhimento', cat: 'Costas', sub: 'Trapézio', nome: 'Encolhimento de ombros', tipo: 'isolado', foco: ['trap_sup'], anim: 'encolhe', img: 'encolhimento',
     musculos: { trapezio: .90, antebraco: .10 },
@@ -783,6 +783,9 @@ const MOVIMENTOS = [
     vars: [
       { id: 'abdominal', nome: 'Crunch (solo)', fe: 'Crunches', eq: 'corpo' },
       { id: 'abdominal_maq', nome: 'Máquina', fe: 'Ab_Crunch_Machine', eq: 'maquina', img: null },
+      { id: 'abdominal_reto', nome: 'Pernas para cima', eq: 'corpo', img: null },
+      { id: 'abdominal_declinado', nome: 'Declinado (banco)', fe: 'Decline_Crunch', eq: 'corpo', ap: 'banco', img: null },
+      { id: 'abdominal_anilha', nome: 'Com anilha', eq: 'halteres', ap: 'anilha', img: null },
       { id: 'abdominal_polia', nome: 'Polia (ajoelhado)', fe: 'Cable_Crunch', foco: ['abd_sup', 'abd_inf'], eq: 'polia', img: null },
     ] },
   { id: 'prancha', cat: 'Core', nome: 'Prancha', tipo: 'isolado', desc: 60, anim: 'prancha', img: 'prancha', seg: true,
@@ -796,6 +799,9 @@ const MOVIMENTOS = [
     vars: [
       { id: 'prancha', nome: 'Frontal', fe: 'Plank', eq: 'corpo' },
       { id: 'prancha_lateral', nome: 'Lateral', uni: true, foco: ['obliquos'], eq: 'corpo', img: null, musculos: { abdomen: .80, gluteos: .10, ombros: .10 } },
+      { id: 'prancha_alta', nome: 'Alta (braços estendidos)', eq: 'corpo', img: null },
+      { id: 'prancha_toque', nome: 'Toque no ombro', eq: 'corpo', img: null },
+      { id: 'prancha_dinamica', nome: 'Dinâmica (sobe e desce)', eq: 'corpo', img: null },
     ] },
   { id: 'elevacao_pernas', cat: 'Core', nome: 'Elevação de pernas', tipo: 'isolado', foco: ['abd_inf'], desc: 60, anim: 'legraise', img: 'elevacao_pernas', faixa: [10, 20],
     musculos: { abdomen: .90, quadriceps: .10 },
@@ -806,7 +812,117 @@ const MOVIMENTOS = [
     ],
     vars: [
       { id: 'elevacao_pernas', nome: 'Deitado', fe: 'Flat_Bench_Lying_Leg_Raise', eq: 'corpo' },
-      { id: 'elevacao_pernas_barra', nome: 'Na barra (suspenso)', fe: 'Hanging_Leg_Raise', eq: 'corpo', img: null },
-      { id: 'elevacao_pernas_paralela', nome: 'Na paralela', eq: 'corpo', img: null },
+      { id: 'abdominal_reverso', nome: 'Abdominal reverso', fe: 'Reverse_Crunch', eq: 'corpo', img: null },
+      { id: 'elevacao_pernas_barra', nome: 'Joelhos na barra', eq: 'corpo', ap: 'barra_fixa', img: null, dica: 'Pendurado, sem balançar: suba os joelhos enrolando o quadril' },
+      { id: 'elevacao_pernas_barra_esticadas', nome: 'Pernas esticadas na barra', fe: 'Hanging_Leg_Raise', eq: 'corpo', ap: 'barra_fixa', img: null, dica: 'Mais difícil: comece pelos joelhos e passe para pernas esticadas' },
+      { id: 'elevacao_pernas_paralela', nome: 'Joelhos na paralela', eq: 'corpo', ap: 'paralela', img: null },
+      { id: 'elevacao_pernas_paralela_esticadas', nome: 'Pernas esticadas na paralela', eq: 'corpo', ap: 'paralela', img: null },
+    ] },
+  { id: 'obliquos', cat: 'Core', nome: 'Oblíquos', tipo: 'isolado', foco: ['obliquos'], desc: 60, anim: 'crunch', img: null, faixa: [12, 20],
+    musculos: { abdomen: 1 },
+    dicas: [
+      'Gire o tronco, não só os braços',
+      'Lombar apoiada e pescoço solto',
+      'Movimento controlado, sem embalo',
+    ],
+    vars: [
+      { id: 'abdominal_bicicleta', nome: 'Bicicleta', fe: 'Air_Bike', eq: 'corpo' },
+      { id: 'abdominal_obliquo', nome: 'Cruzado alternado', fe: 'Cross-Body_Crunch', eq: 'corpo' },
+      { id: 'toque_calcanhar', nome: 'Toque no calcanhar', eq: 'corpo' },
+      { id: 'russian_twist', nome: 'Russian twist com halter', fe: 'Russian_Twist', eq: 'halteres' },
+      { id: 'flexao_lateral_45', nome: 'Flexão lateral no banco 45°', uni: true, eq: 'corpo', ap: 'banco' },
+    ] },
+  { id: 'estabilidade_core', cat: 'Core', nome: 'Estabilidade do core', tipo: 'isolado', foco: ['abd_sup', 'abd_inf'], desc: 60, anim: 'prancha', img: null, faixa: [8, 15],
+    musculos: { abdomen: .80, lombar: .20 },
+    dicas: [
+      'Lombar neutra o tempo todo — não deixe arquear',
+      'Devagar: o trabalho é segurar a posição',
+      'Respire sem soltar o abdômen',
+    ],
+    vars: [
+      { id: 'dead_bug', nome: 'Dead bug', fe: 'Dead_Bug', eq: 'corpo' },
+      { id: 'bird_dog', nome: 'Bird dog (perdigueiro)', eq: 'corpo', musculos: { abdomen: .60, lombar: .30, gluteos: .10 } },
+      { id: 'roda_abdominal', nome: 'Roda abdominal', fe: 'Ab_Roller', eq: 'corpo', ap: 'roda', dica: 'Comece de joelhos e só vá até onde a lombar não cede' },
+      { id: 'pallof', nome: 'Pallof na polia', uni: true, foco: ['obliquos'], eq: 'polia', dica: 'Empurre o cabo à frente e não deixe o tronco girar' },
+    ] },
+  { id: 'pernas_alternadas', cat: 'Core', nome: 'Pernas alternadas', tipo: 'isolado', foco: ['abd_inf'], desc: 60, anim: 'legraise', img: null, faixa: [16, 30],
+    musculos: { abdomen: .85, quadriceps: .15 },
+    dicas: [
+      'Lombar colada no chão',
+      'Pernas perto do chão deixam mais difícil',
+      'Conte cada perna como uma repetição',
+    ],
+    vars: [
+      { id: 'tesoura', nome: 'Tesoura', fe: 'Scissor_Kick', eq: 'corpo' },
+      { id: 'v_up', nome: 'V-up (canivete)', eq: 'corpo', musculos: { abdomen: .90, quadriceps: .10 } },
+      { id: 'flutter_banco', nome: 'Flutter sentado no banco', eq: 'corpo', ap: 'banco' },
     ] },
 ];
+
+// ---------- classificação para volume e divisão ----------
+// Alvos de volume: os músculos do mapa, com o ombro dividido em três partes (cada uma vai para um treino).
+const ALVOS_VOL = [
+  { id: 'peito',       nome: 'Peito',              m: 'peito',       treino: 'empurrar', meta: [12, 16] },
+  { id: 'delt_ant',    nome: 'Ombro anterior',     m: 'ombros',      treino: 'empurrar', meta: null },
+  { id: 'delt_lat',    nome: 'Ombro lateral',      m: 'ombros',      treino: 'empurrar', meta: [10, 14] },
+  { id: 'triceps',     nome: 'Tríceps',            m: 'triceps',     treino: 'empurrar', meta: [10, 14] },
+  { id: 'costas',      nome: 'Costas',             m: 'costas',      treino: 'puxar',    meta: [12, 20] },
+  { id: 'delt_post',   nome: 'Ombro posterior',    m: 'ombros',      treino: 'puxar',    meta: [8, 12] },
+  { id: 'trapezio',    nome: 'Trapézio',           m: 'trapezio',    treino: 'puxar',    meta: [6, 10] },
+  { id: 'biceps',      nome: 'Bíceps',             m: 'biceps',      treino: 'puxar',    meta: [10, 14] },
+  { id: 'antebraco',   nome: 'Antebraço',          m: 'antebraco',   treino: 'puxar',    meta: null },
+  { id: 'quadriceps',  nome: 'Quadríceps',         m: 'quadriceps',  treino: 'pernas',   meta: [12, 16] },
+  { id: 'posteriores', nome: 'Posteriores',        m: 'posteriores', treino: 'pernas',   meta: [10, 14] },
+  { id: 'gluteos',     nome: 'Glúteos',            m: 'gluteos',     treino: 'pernas',   meta: [8, 12] },
+  { id: 'adutores',    nome: 'Adutores',           m: 'adutores',    treino: 'pernas',   meta: null },
+  { id: 'panturrilha', nome: 'Panturrilha',        m: 'panturrilha', treino: 'pernas',   meta: [8, 12] },
+  { id: 'lombar',      nome: 'Lombar',             m: 'lombar',      treino: 'pernas',   meta: null },
+  { id: 'abdomen',     nome: 'Abdômen',            m: 'abdomen',     treino: 'core',     meta: [6, 10] },
+];
+
+// Principal e auxiliares de cada movimento (ou variação, que tem prioridade): [principal, ...auxiliares].
+// Na contagem de volume, a série vale 1 para o principal e ½ para cada auxiliar. O treino do exercício vem do principal.
+const CLASSIFICA = {
+  // Empurrar
+  supino_reto: ['peito', 'triceps', 'delt_ant'], supino_inclinado: ['peito', 'delt_ant', 'triceps'], supino_declinado: ['peito', 'triceps'],
+  crucifixo: ['peito', 'delt_ant'], crossover: ['peito', 'delt_ant'], flexao: ['peito', 'triceps', 'delt_ant'], flexao_diamante: ['triceps', 'peito'],
+  paralelas: ['peito', 'triceps', 'delt_ant'], paralelas_maq: ['triceps', 'peito'], paralelas_banco: ['triceps'],
+  desenvolvimento: ['delt_ant', 'delt_lat', 'triceps'], elevacao_lateral: ['delt_lat'], elevacao_frontal: ['delt_ant'],
+  triceps_pulley: ['triceps'], triceps_testa: ['triceps'], triceps_frances: ['triceps'],
+  // Puxar
+  barra_fixa: ['costas', 'biceps'], puxada_frontal: ['costas', 'biceps'], pullover: ['costas', 'peito', 'triceps'], pullover_polia: ['costas'],
+  remada_curvada: ['costas', 'biceps', 'delt_post', 'trapezio'], remada_baixa: ['costas', 'biceps', 'delt_post', 'trapezio'],
+  remada_maquina: ['costas', 'biceps', 'delt_post', 'trapezio'], serrote: ['costas', 'biceps', 'delt_post'],
+  crucifixo_inverso: ['delt_post', 'trapezio', 'costas'], face_pull: ['delt_post', 'trapezio'], remada_alta: ['trapezio', 'delt_lat', 'biceps'],
+  encolhimento: ['trapezio', 'antebraco'], rosca_direta: ['biceps', 'antebraco'], rosca_alternada: ['biceps', 'antebraco'],
+  rosca_martelo: ['biceps', 'antebraco'], rosca_scott: ['biceps'], rosca_punho: ['antebraco'],
+  // Pernas
+  agachamento: ['quadriceps', 'gluteos', 'posteriores'], hack: ['quadriceps', 'gluteos'], leg_press: ['quadriceps', 'gluteos'],
+  extensora: ['quadriceps'], afundo: ['quadriceps', 'gluteos'], bulgaro: ['quadriceps', 'gluteos'], flexora: ['posteriores', 'panturrilha'],
+  stiff: ['posteriores', 'gluteos', 'lombar'], levantamento_terra: ['posteriores', 'gluteos', 'lombar', 'trapezio', 'quadriceps'],
+  hiperextensao: ['lombar', 'gluteos', 'posteriores'], elevacao_pelvica: ['gluteos', 'posteriores'], coice: ['gluteos', 'posteriores'],
+  abdutora: ['gluteos'], adutora: ['adutores'], panturrilha: ['panturrilha'],
+  // Core (fora do rodízio)
+  abdominal: ['abdomen'], prancha: ['abdomen', 'lombar'], elevacao_pernas: ['abdomen'], obliquos: ['abdomen'],
+  estabilidade_core: ['abdomen', 'lombar'], pernas_alternadas: ['abdomen'],
+};
+
+// Rotinas da divisão, versões A e B (o app alterna). Cada item: [variação, preparatórias, séries de trabalho].
+// Nenhum movimento se repete entre A e B, menos os músculos que só têm um movimento (elevação lateral, flexora,
+// panturrilha), que aparecem nas duas em variações diferentes.
+const ROTINAS_PPL = {
+  empurrar: {
+    A: { foco: 'foco peito', itens: [['supino_reto', 3, 4], ['supino_inclinado', 1, 3], ['crossover_media', 0, 3], ['elevacao_lateral', 1, 4], ['triceps_corda', 1, 3]] },
+    B: { foco: 'foco ombro', itens: [['desenv_halteres', 3, 4], ['supino_declinado_halt', 1, 3], ['crucifixo', 0, 3], ['elevacao_lateral_polia', 0, 4], ['triceps_frances_polia', 1, 3]] },
+  },
+  puxar: {
+    A: { foco: 'foco largura', itens: [['barra_fixa', 2, 4], ['remada_baixa', 1, 3], ['pullover_polia', 0, 3], ['crucifixo_inverso_maq', 1, 3], ['rosca_direta', 1, 3]] },
+    B: { foco: 'foco espessura', itens: [['remada_curvada', 3, 4], ['puxada_triangulo', 1, 3], ['face_pull', 1, 3], ['encolhimento_halt', 1, 3], ['rosca_martelo', 1, 3]] },
+  },
+  pernas: {
+    A: { foco: 'foco quadríceps', itens: [['agachamento', 3, 4], ['leg_press', 1, 3], ['extensora', 0, 3], ['flexora', 1, 3], ['panturrilha_pe', 1, 4], ['abdominal', 0, 3]] },
+    B: { foco: 'foco posterior e glúteo', itens: [['stiff', 3, 4], ['hack', 1, 3], ['elevacao_pelvica', 1, 3], ['flexora_sentada', 0, 3], ['panturrilha_sentado', 1, 4], ['elevacao_pernas', 0, 3]] },
+  },
+};
+// carga e repetições das preparatórias, pelo número delas: [fração da carga de trabalho, repetições]
+const PREP_ESQUEMA = { 1: [[0.6, 8]], 2: [[0.5, 10], [0.75, 5]], 3: [[0.5, 10], [0.7, 5], [0.85, 2]] };

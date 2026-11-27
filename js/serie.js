@@ -6,10 +6,24 @@
 const porLado = ex => prefs.lados && ex.id in prefs.lados ? prefs.lados[ex.id] : ex.uni;
 const descansoDe = exId => prefs.descansos[exId] || (exMap[exId] ? exMap[exId].desc : 90);
 const fmtDesc = s => (s < 120 || s % 60 ? `${s} s` : `${s / 60} min`);
-const nSerie = ex => { const l = logHoje(ex.id); return (l ? l.sets.length : 0) + 1; };
-// séries planejadas: as da última sessão desta variação (ou 3)
-const seriesPlano = ex => { const d = dicaCarga(ex.id); return d ? Math.max(1, d.u.sets.length) : 3; };
-const deSeries = (ex, n) => (n <= seriesPlano(ex) ? ` de ${seriesPlano(ex)}` : '');
+const nSerie = ex => { const l = logHoje(ex.id); return (l ? l.sets.length : 0) + 1; }; // séries de hoje (todas) + 1
+// séries de trabalho planejadas: as do plano do dia; senão as da última sessão desta variação (ou 3)
+const seriesPlano = ex => { const pl = planoDoExercicio(ex.id); if (pl) return pl.trab; const d = dicaCarga(ex.id); return d ? Math.max(1, d.u.sets.length) : 3; };
+// a próxima série: preparatória ou de trabalho, cada uma com a própria contagem ("Preparatória 1 de 3", "Série 2 de 4")
+function rotuloSerie(ex) {
+  const l = logHoje(ex.id), sets = l ? l.sets : [];
+  if (form.prep) {
+    const k = preps(sets).length + 1, p = (planoDoExercicio(ex.id) || {}).prep || 0;
+    return { curto: `P${k}`, txt: `Preparatória ${k}`, min: `preparatória ${k}`, de: k <= p ? ` de ${p}` : '' };
+  }
+  const n = trab(sets).length + 1, pl = seriesPlano(ex);
+  return { curto: String(n), txt: `Série ${n}`, min: `série ${n}`, de: n <= pl ? ` de ${pl}` : '' };
+}
+const botaoPrep = () => `<button class="chip" id="bt-prep" role="switch" aria-checked="${!!form.prep}">Preparatória</button>`;
+function bindPrep(ex) {
+  const b = $('bt-prep');
+  if (b) b.onclick = () => { preencheForm(ex, !form.prep); renderCtl(); };
+}
 const telaSerieAberta = () => !!ativo.ex && !ativo.minimizado && (emSerie() || ativo.telaDesc);
 const alvoForm = ex => `${carga(parseFloat(form.peso) || 0)} × ${porLado(ex) ? `${form.repsE}/${form.repsD}` : form.reps}${ex.seg ? ' s' : ''}`;
 
@@ -22,7 +36,7 @@ function renderCtl() {
 
 // próximo exercício da rotina/treino em andamento que ainda não foi feito hoje
 function proximoDaRotina() {
-  const rot = rotinaAtiva();
+  const rot = rotinaAtiva() || rotinaDoDia();
   if (!rot) return null;
   const feitos = new Set(logs.filter(l => dayKey(l.ts) === hojeKey()).map(l => l.ex));
   return rot.itens.find(id => exMap[id] && !feitos.has(id) && id !== ativo.ex) || null;
@@ -36,15 +50,16 @@ function renderDock() {
   dock.hidden = !visivel;
   document.body.classList.toggle('com-dock', visivel);
   if (!visivel) { dock.innerHTML = ''; return; } // sem ids repetidos com a tela de série
-  const ex = exMap[ativo.ex], n = nSerie(ex);
+  const ex = exMap[ativo.ex], n = nSerie(ex), r = rotuloSerie(ex);
   const prox = proximoDaRotina();
   const fim = prox ? `<button class="btn-texto" id="bt-prox">Próximo: ${esc(nomeMov(prox))}</button>`
     : n > 1 ? '<button class="btn-texto neutro" id="bt-concluir">Concluir exercício</button>' : '';
-  dock.innerHTML = `<div class="dock-cab"><b>Série ${n}<span class="c-3" style="font-weight:500">${deSeries(ex, n)}</span></b><span class="mudo">toque no número para digitar</span></div>
+  dock.innerHTML = `<div class="dock-cab"><b id="dock-rot">${r.txt}<span class="c-3" style="font-weight:500">${r.de}</span></b>${botaoPrep()}</div>
     ${steppers(ex)}
-    <button class="grande larga" id="bt-iniciar">${ic('play-fill')}Iniciar série ${n}</button>
+    <button class="grande larga" id="bt-iniciar">${ic('play-fill')}Iniciar ${r.min}</button>
     <div class="dock-links"><button class="btn-texto" id="bt-sem-crono">Anotar sem cronometrar</button>${fim ? `<span id="p-fim">${fim}</span>` : ''}</div>`;
   bindSteppers(dock, ex);
+  bindPrep(ex);
   $('bt-iniciar').onclick = iniciarSerie;
   $('bt-sem-crono').onclick = () => {
     ativo.pend = { dur: null, ini: null, fim: null };
@@ -101,7 +116,7 @@ function renderSerieTela() {
   tela.hidden = !aberta;
   document.body.classList.toggle('tela-cheia', aberta);
   if (!aberta) { tela.innerHTML = ''; return; }
-  const ex = exMap[ativo.ex], est = ativo.estado, n = nSerie(ex);
+  const ex = exMap[ativo.ex], est = ativo.estado, r = rotuloSerie(ex);
   const topo = `<div class="fs-topo"><button class="btn-ic" id="bt-minimizar" aria-label="Minimizar">${ic('caret-down', 'ic-24')}</button>
     <div class="fs-titulo">${esc(ex.nome)}</div><span class="esp"></span></div>`;
 
@@ -109,9 +124,9 @@ function renderSerieTela() {
     const cont = est === 'contagem';
     const txt = cont ? Math.max(1, Math.ceil((ativo.serieIni - Date.now()) / 1000)) : mmss((Date.now() - ativo.serieIni) / 1000);
     tela.innerHTML = `${topo}<div class="fs-corpo centro ${est}">
-        <div class="kicker azul" style="font-size:13px;font-weight:600;letter-spacing:.08em">${cont ? 'Prepare-se' : `Série ${n}${deSeries(ex, n)}`}</div>
+        <div class="kicker azul" style="font-size:13px;font-weight:600;letter-spacing:.08em">${cont ? 'Prepare-se' : `${r.txt}${r.de}`}</div>
         <div class="crono" id="crono" role="timer">${txt}</div>
-        <div class="fs-status"><span class="ponto"></span>${cont ? `a série ${n} vai começar` : 'cronometrando a série'}</div>
+        <div class="fs-status"><span class="ponto"></span>${cont ? `a ${r.min} vai começar` : 'cronometrando a série'}</div>
         <div class="fs-alvo"><span class="mudo">alvo</span><b>${esc(alvoForm(ex))}</b></div>
         ${ex.dicas.length ? `<div class="card dicas-card"><div class="kicker">${ic('target', 'ic-14')}Pontos de atenção</div>${ex.dicas.slice(0, 3).map(d => `<p>${esc(d)}</p>`).join('')}</div>` : ''}
       </div>
@@ -122,7 +137,7 @@ function renderSerieTela() {
   } else if (est === 'anotando') {
     const dur = ativo.pend && ativo.pend.dur;
     tela.innerHTML = `${topo}<div class="fs-corpo">
-        <div class="fs-cab"><span class="fs-pergunta">Como foi a série ${n}?</span>${dur ? `<span class="mudo">${ic('timer', 'ic-14')}${mmss(dur)}</span>` : ''}</div>
+        <div class="fs-cab"><span class="fs-pergunta">Como foi a ${r.min}?</span>${dur ? `<span class="mudo">${ic('timer', 'ic-14')}${mmss(dur)}</span>` : ''}</div>
         <div class="fs-grupo">${steppers(ex, true)}
           <div class="fs-bloco"><div><div style="font-weight:500;color:var(--t-2)">Quantas repetições ainda sobravam?</div><div class="mudo">com boa forma — opcional</div></div>
             <div class="rir-op" role="radiogroup" aria-label="Repetições na reserva">${[0, 1, 2, 3, 4].map(r =>
@@ -155,20 +170,20 @@ function estadoDescanso(ex) {
 }
 
 function renderTelaDescanso(tela, topo, ex) {
-  const l = logHoje(ex.id), sets = l ? l.sets : [], n = sets.length + 1;
-  const plano = Math.max(seriesPlano(ex), sets.length);
+  const l = logHoje(ex.id), sets = l ? l.sets : [], r = rotuloSerie(ex);
+  const nTrab = trab(sets).length, plano = form.prep ? 0 : Math.max(seriesPlano(ex), nTrab);
   const d = estadoDescanso(ex);
   const pr = ativo.prUlt && ativo.prUlt.ex === ex.id && ativo.prUlt.n === sets.length ? ativo.prUlt : null;
   // últimas feitas + próxima + planejadas (até 4 linhas)
   const linhas = [];
   sets.slice(-2).forEach((s, i, arr) => {
-    const num_ = sets.length - arr.length + i + 1;
+    const num_ = s.prep ? 'P' : trab(sets.slice(0, sets.length - arr.length + i + 1)).length;
     const extra = [s.rir != null ? rirTxt(s.rir) : '', s.dur ? mmss(s.dur) : ''].filter(Boolean).join(' · ');
     linhas.push(`<div class="serie"><span class="n">${num_}</span><span class="info nome">${esc(carga(s.peso))} × ${esc(repsTxt(s, ex.seg))}</span>
       ${extra ? `<span class="lado">${extra}</span>` : ''}${s.pr ? `<span aria-label="Recorde" style="display:flex">${ic('trophy-fill', 'ic-16 ic-pr')}</span>` : ''}</div>`);
   });
-  linhas.push(`<div class="serie prox"><span class="n prox">${n}</span><span class="info nome">${esc(alvoForm(ex))}</span><span class="lado">próxima</span></div>`);
-  for (let k = n + 1; k <= plano && linhas.length < 4; k++) linhas.push(`<div class="serie plan"><span class="n plan">${k}</span><span class="info nome">${esc(alvoForm(ex))}</span><span class="lado">planejada</span></div>`);
+  linhas.push(`<div class="serie prox"><span class="n prox">${r.curto}</span><span class="info nome">${esc(alvoForm(ex))}</span><span class="lado">${form.prep ? 'preparatória' : 'próxima'}</span></div>`);
+  for (let k = nTrab + 2; k <= plano && linhas.length < 4; k++) linhas.push(`<div class="serie plan"><span class="n plan">${k}</span><span class="info nome">${esc(alvoForm(ex))}</span><span class="lado">planejada</span></div>`);
   const prox = proximoDaRotina();
   tela.innerHTML = `${topo}<div class="fs-corpo desc">
       ${pr ? `<div class="pr-card" role="status">${ic('trophy-fill', 'ic-30')}<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">Novo recorde</div>
@@ -182,7 +197,7 @@ function renderTelaDescanso(tela, topo, ex) {
         <button class="ghost" id="bt-pular">${ic('skip-forward', 'ic-18')}Pular</button></div>
     </div>
     <div class="fs-base"><div class="lista series-lista">${linhas.join('')}</div>
-      <button class="xl larga" id="bt-iniciar-fs">${ic('play-fill', 'ic-22')}Iniciar série ${n}</button>
+      <button class="xl larga" id="bt-iniciar-fs">${ic('play-fill', 'ic-22')}Iniciar ${r.min}</button>
       <button class="btn-texto neutro" id="bt-fim-fs">${prox ? `Próximo: ${esc(nomeMov(prox))}` : 'Concluir exercício'}</button></div>`;
   tela.querySelectorAll('[data-desc-aj]').forEach(b => b.onclick = () => {
     const dd = +b.dataset.descAj;
@@ -316,9 +331,11 @@ function salvarSerie() {
     const d = Math.round((pend.ini - anterior.ts) / 1000);
     if (d > 0 && d < 1800) set.desc = d;
   }
-  const pr = ehRecorde(ex.id, peso, reps);
+  const prep = !!form.prep;
+  const pr = !prep && ehRecorde(ex.id, peso, reps); // preparatória não vira recorde
   const prTxt = pr ? textoRecorde(ex.id, peso, reps, ex.seg) : '';
   if (pr) set.pr = true;
+  if (prep) set.prep = true;
   if (!l) {
     l = { id: agora + Math.random(), ex: ex.id, ts: set.ts, sets: [] };
     logs.push(l);
@@ -331,7 +348,7 @@ function salvarSerie() {
   ativo.telaDesc = true;
   ativo.prUlt = pr ? { ex: ex.id, n: l.sets.length, txt: prTxt } : null;
   preencheForm(ex);
-  iniciarDescanso(descansoDe(ex.id));
-  if (ativo.minimizado) toast(pr ? 'Novo recorde!' : `Série ${l.sets.length} salva`);
+  iniciarDescanso(prep ? Math.min(60, descansoDe(ex.id)) : descansoDe(ex.id)); // depois da preparatória, descanso curto
+  if (ativo.minimizado) toast(pr ? 'Novo recorde!' : prep ? 'Preparatória salva' : `Série ${trab(l.sets).length} salva`);
   renderSeriesPainel();
 }

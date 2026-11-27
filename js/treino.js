@@ -96,25 +96,46 @@ function renderListaGrupo(el) {
   let html = u ? `<button class="ghost bt-repetir" id="bt-repetir">${ic('arrow-counter-clockwise', 'ic-22')}
       <span class="ll-txt"><span class="ll-nome">Repetir treino de ${dataCurta(u.ts)}</span>
       <span class="ll-det">${esc([...new Set(u.itens.filter(id => exMap[id]).map(id => movMap[exMap[id].mov].nome))].join(', '))}</span></span>${ic('caret-right')}</button>` : '';
-  html += `<div class="secao"><div class="secao-cab"><span class="kicker">${plural(lista.length, 'exercício', 'exercícios')}</span>
+  // filtro por equipamento (só aparece se o grupo tem mais de um tipo); lembrado por grupo
+  const tiposGrupo = TIPOS_EQ.filter(t => lista.some(m => m.vars.some(v => tipoEq(exMap[v.id]) === t.id)));
+  const filtros = prefs.filtroEq || {};
+  const filtro = tiposGrupo.length > 1 && tiposGrupo.some(t => t.id === filtros[ativo.grupo]) ? filtros[ativo.grupo] : null;
+  const varsOk = m => m.vars.map(v => exMap[v.id]).filter(e => !filtro || tipoEq(e) === filtro);
+  const listaF = lista.filter(m => varsOk(m).length);
+  if (tiposGrupo.length > 1) html += `<div class="chips rolar filtro-eq" role="radiogroup" aria-label="Equipamento">
+    <button class="chip" role="radio" data-eq="" aria-checked="${!filtro}">Tudo</button>${tiposGrupo.map(t =>
+      `<button class="chip" role="radio" data-eq="${t.id}" aria-checked="${filtro === t.id}">${ic(t.ic, 'ic-16')}${esc(t.nome)}</button>`).join('')}</div>`;
+  html += `<div class="secao"><div class="secao-cab"><span class="kicker">${plural(listaF.length, 'exercício', 'exercícios')}</span>
     <span class="legenda-foco"><span><span class="ponto"></span>foco</span><span><span class="ponto aux"></span>auxiliar</span></span></div>`;
   // subgrupos (ex.: Quadríceps, Posteriores); personalizado não "herda" o subgrupo de cima
   const temSub = lista.some(m => m.sub);
   const secoes = [];
-  for (const m of lista) {
+  for (const m of listaF) {
     const sub = m.sub || (temSub ? 'Personalizados' : null);
     if (!secoes.length || secoes[secoes.length - 1].sub !== sub) secoes.push({ sub, movs: [] });
     secoes[secoes.length - 1].movs.push(m);
   }
-  html += secoes.map((sc, i) => `${sc.sub ? `<div class="kicker" style="padding:${i ? '10px' : '0'} 4px 0">${esc(sc.sub)}</div>` : ''}
-    <div class="lista">${sc.movs.map(m => linhaMov(m, ultimo, recup)).join('')}</div>`).join('');
+  // grupo com mais de um treino (Braços): os subgrupos do treino de hoje vêm primeiro; os outros ficam no fim, avisados
+  const tDia = treinoDeHoje();
+  if (tDia && temSub) {
+    secoes.forEach(sc => { sc.fora = sc.movs.every(m => !exNoTreino(m, tDia)); });
+    if (secoes.some(sc => !sc.fora)) secoes.sort((a, b) => a.fora - b.fora);
+    else secoes.forEach(sc => { sc.fora = false; });
+  }
+  html += secoes.map((sc, i) => `${sc.sub ? `<div class="kicker" style="padding:${i ? '10px' : '0'} 4px 0">${esc(sc.sub)}${sc.fora ? ` <span class="mudo">· fora do treino de ${esc(tDia.nome)}</span>` : ''}</div>` : ''}
+    <div class="lista">${sc.movs.map(m => linhaMov(m, ultimo, recup, varsOk(m))).join('')}</div>`).join('');
   corpo.innerHTML = html + '</div>';
   if (u) $('bt-repetir').onclick = () => repetirTreino(ativo.grupo);
   corpo.querySelectorAll('.mov[data-ex]').forEach(b => b.onclick = () => abrirExercicio(b.dataset.ex));
+  corpo.querySelectorAll('[data-eq]').forEach(b => b.onclick = () => {
+    prefs.filtroEq = { ...(prefs.filtroEq || {}), [ativo.grupo]: b.dataset.eq || null };
+    salvarPrefs();
+    renderListaGrupo(el);
+  });
+  mostraChipMarcado(corpo.querySelector('.filtro-eq'));
 }
 
-function linhaMov(m, ultimo, recup) {
-  const vars = m.vars.map(v => exMap[v.id]);
+function linhaMov(m, ultimo, recup, vars = m.vars.map(v => exMap[v.id])) {
   const recente = vars.filter(v => ultimo[v.id]).sort((a, b) => ultimo[b.id].ts - ultimo[a.id].ts)[0];
   const abre = recente || vars[0];
   const fi = focoInfo({ musculos: m.musculos, foco: m.foco || [] });
@@ -193,8 +214,9 @@ function renderPainel(el) {
       <span><button class="btn-ic" id="bt-nota-ic" aria-label="Anotação">${ic('note-pencil', 'ic-22')}</button><button class="btn-ic" id="bt-mais" aria-label="Mais opções">${ic('dots-three', 'ic-22')}</button></span></div>
     <h1 class="p-titulo">${esc(mov.nome)}</h1>
     <div class="chips rolar p-vars" role="radiogroup" aria-label="Variação">${mov.vars.map(v =>
-      `<button class="chip" role="radio" aria-checked="${v.id === ex.id}" data-var="${v.id}">${esc(v.nome)}</button>`).join('')}
+      `<button class="chip" role="radio" aria-checked="${v.id === ex.id}" data-var="${v.id}" title="${esc(nomeEq(exMap[v.id]))}">${ic(infoTipoEq(exMap[v.id]).ic, 'ic-16')}${esc(v.nome)}</button>`).join('')}
       <button class="chip chip-mais" data-novavar="${mov.id}" aria-label="Nova variação">${ic('plus', 'ic-16')}</button></div>
+    <div class="p-eq mudo">${ic(infoTipoEq(ex).ic, 'ic-16')}${esc(infoTipoEq(ex).nome)}${tipoEq(ex) !== 'livre' ? ` · ${esc(nomeEq(ex))}` : ''}</div>
     <div class="card alvo-card" id="ref"></div>
     <div class="secao" id="sec-series" hidden><div class="kicker">Séries de hoje</div><div class="lista series-lista" id="series"></div><div id="esforco"></div></div>
     <div class="midia">
@@ -213,6 +235,7 @@ function renderPainel(el) {
     </div>`;
   $('bt-voltar').onclick = () => fecharExercicio(false);
   el.querySelectorAll('[data-var]').forEach(b => b.onclick = () => abrirExercicio(b.dataset.var));
+  mostraChipMarcado(el.querySelector('.p-vars'));
   el.querySelector('[data-novavar]').onclick = () => novaVariacao(mov.id);
   $('bt-nota-ic').onclick = editarNota;
   $('bt-mais').onclick = () => menuPainel(ex);
@@ -256,17 +279,27 @@ function escolherDescanso(ex) {
   } })));
 }
 
-function preencheForm(ex) {
-  const l = logHoje(ex.id);
-  form = { ex: ex.id, rir: null, peso: 20, reps: 10 };
-  if (l && l.sets.length) { // continua de onde parou hoje
-    const u = l.sets[l.sets.length - 1];
+// prep: força preparatória (true) ou de trabalho (false); sem ele, faz as preparatórias do plano do dia antes das de trabalho
+function preencheForm(ex, prep) {
+  const l = logHoje(ex.id), sets = l ? l.sets : [], t = trab(sets), p = preps(sets);
+  const pl = planoDoExercicio(ex.id);
+  const prepFalta = pl && pl.prep && !t.length ? pl.prep - p.length : 0;
+  form = { ex: ex.id, rir: null, peso: 20, reps: 10, prep: prep ?? prepFalta > 0 };
+  const d = dicaCarga(ex.id);
+  const alvoPeso = d ? d.alvoPeso : ex.corpo ? 0 : 20;
+  const alvoReps = d ? d.alvoReps : ex.seg ? 30 : Math.round((ex.faixa[0] + ex.faixa[1]) / 2);
+  if (form.prep) { // carga em % da de trabalho (PREP_ESQUEMA)
+    const esq = PREP_ESQUEMA[Math.min(3, Math.max(1, (pl && pl.prep) || 1))];
+    const [f, r] = esq[Math.min(p.length, esq.length - 1)];
+    form.peso = alvoPeso > 0 ? Math.max(0, +(Math.round(alvoPeso * f / ex.inc) * ex.inc).toFixed(2)) : alvoPeso;
+    form.reps = ex.seg ? Math.round(alvoReps / 2) : r;
+  } else if (t.length) { // continua de onde parou hoje
+    const u = t[t.length - 1];
     form.peso = u.peso; form.reps = u.reps;
     if (u.repsE != null) { form.repsE = u.repsE; form.repsD = u.repsD; }
   } else {
-    const d = dicaCarga(ex.id);
-    form.peso = d ? d.alvoPeso : ex.corpo ? 0 : 20;
-    form.reps = d ? d.alvoReps : ex.seg ? 30 : Math.round((ex.faixa[0] + ex.faixa[1]) / 2);
+    form.peso = alvoPeso;
+    form.reps = alvoReps;
   }
   form.repsE ??= form.reps; form.repsD ??= form.reps;
   if (ativo.estado === 'anotando' && ativo.pend && ativo.pend.dur && ex.seg) form.reps = form.repsE = form.repsD = ativo.pend.dur;
@@ -275,10 +308,11 @@ function preencheForm(ex) {
 // dica de progressão (progressão dupla: sobe reps até o teto da faixa, depois sobe carga)
 function dicaCarga(exId) {
   const hoje = hojeKey();
-  const ant = logs.filter(l => l.ex === exId && l.sets.length && dayKey(l.ts) !== hoje);
+  const ant = logs.filter(l => l.ex === exId && trab(l.sets).length && dayKey(l.ts) !== hoje);
   if (!ant.length) return null;
   const ex = exMap[exId];
-  const u = ant.reduce((a, b) => b.ts > a.ts ? b : a);
+  const ul = ant.reduce((a, b) => b.ts > a.ts ? b : a);
+  const u = { ...ul, sets: trab(ul.sets) }; // a progressão olha só as séries de trabalho
   const top = melhorSerie(u.sets);
   const [lo, hi] = ex ? ex.faixa : [8, 12];
   const inc = ex ? ex.inc : 2.5;
@@ -416,7 +450,8 @@ function itemSerie(ex, sets, i) {
   }
   if (s.rir != null) det.push(`<span class="rir r${Math.min(s.rir, 4)}">${rirTxt(s.rir)}</span>`);
   if (s.desc) det.push(`descanso ${mmss(s.desc)}`);
-  return `<div class="serie"><span class="n">${i + 1}</span>
+  if (s.prep) det.unshift('preparatória');
+  return `<div class="serie${s.prep ? ' prep' : ''}"><span class="n">${s.prep ? 'P' : trab(sets.slice(0, i + 1)).length}</span>
     <div class="info"><div class="nome">${esc(carga(s.peso))} × ${esc(repsTxt(s, ex.seg))}${s.pr ? `<span class="badge-pr">${ic('trophy-fill')}PR</span>` : ''}</div>
     ${det.length ? `<div class="det">${det.join(' · ')}</div>` : ''}</div>
     <button class="btn-ic" data-editar="${i}" aria-label="Editar série ${i + 1}">${ic('pencil-simple', 'ic-18')}</button>
