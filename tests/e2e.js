@@ -210,6 +210,20 @@ async function novaPagina(browser, base, dados) {
     ok(!pg.erros.length, 'sem erros de página (rotinas) ' + pg.erros.join(' | '));
   }
 
+  // 4d) frequência variável: treino que não aparece há 6+ dias ganha +1 série de trabalho por exercício
+  {
+    const pg = await novaPagina(browser, base, {
+      'carga.logs': [
+        { id: 1, ex: 'supino_reto', ts: agora - 7 * D, sets: [{ peso: 60, reps: 10, ts: agora - 7 * D }] },
+        { id: 2, ex: 'barra_fixa', ts: agora - 3 * D, sets: [{ peso: 0, reps: 8, ts: agora - 3 * D }] },
+      ],
+    });
+    const r = await pg.evaluate(() => { const d = diasPorTreino(); const emp = planoTreino(TREINOS[0], d); return { emp, pux: planoTreino(TREINOS[1], d), base: Object.fromEntries(ROTINAS_PPL.empurrar[emp.v].itens.map(([x, , n]) => [x, n])) }; });
+    ok(r.emp.extra === 1 && r.emp.itens.every(id => r.emp.series[id] === Math.min(5, r.base[id] + 1)), 'Empurrar feito há 7 dias (1x na semana): +1 série em cada exercício');
+    ok(r.pux.extra === 0 && r.pux.series.remada_curvada === 4, 'Puxar feito há 3 dias (2x na semana): séries da rotina');
+    ok(!pg.erros.length, 'sem erros de página (frequência) ' + pg.erros.join(' | '));
+  }
+
   // 4c) Empurrar A com preparatórias: contam à parte, sem recorde, e a carga de trabalho volta depois
   {
     const pg = await novaPagina(browser, base, {

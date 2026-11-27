@@ -79,6 +79,15 @@ function versaoTreino(t, dias) {
   return ant ? outraVersao(versaoDoDia(t, ant)) : 'A';
 }
 
+// A rotina foi montada para cada treino 2x por semana. Se o mesmo treino não foi feito nos últimos 6 dias
+// (ritmo de 1x por semana, como quem treina 3 dias), cada exercício ganha +1 série de trabalho (até 5)
+// para o músculo ainda chegar perto da meta semanal. Treinando 4 ou 5 dias, isso vale só para o treino que ficou para trás.
+const SERIE_EXTRA_DIAS = 6;
+function diasDesde(t, dias) {
+  const ant = (dias[t.id] || []).find(x => x.dia !== hojeKey());
+  return ant ? Math.round((new Date(hojeKey() + 'T12:00') - new Date(ant.dia + 'T12:00')) / 864e5) : null;
+}
+
 // plano: a rotina da versão de hoje, com preparatórias e séries de trabalho. Se da última vez nesta versão
 // você fez outra variação do mesmo movimento, ou trocou o exercício por outro do mesmo músculo principal, a troca fica.
 function planoTreino(t, dias) {
@@ -87,6 +96,7 @@ function planoTreino(t, dias) {
   const feitosAnt = ultMesma ? [...new Set(ultMesma.logs.map(l => l.ex))].filter(id => exMap[id]) : [];
   const naRotina = new Set(rot.itens.map(([id]) => id));
   const usados = new Set();
+  const desde = diasDesde(t, dias), extra = desde != null && desde >= SERIE_EXTRA_DIAS ? 1 : 0;
   const itens = [], series = {}, prep = {};
   for (const [id0, p, n] of rot.itens) {
     const base = exMap[id0];
@@ -100,9 +110,9 @@ function planoTreino(t, dias) {
     }
     if (usados.has(id)) continue;
     usados.add(id);
-    itens.push(id); series[id] = n; prep[id] = p;
+    itens.push(id); series[id] = Math.min(5, n + extra); prep[id] = p;
   }
-  return { ts: ultMesma ? ultMesma.logs[0].ts : 0, itens, series, prep, v, foco: rot.foco };
+  return { ts: ultMesma ? ultMesma.logs[0].ts : 0, itens, series, prep, v, foco: rot.foco, extra };
 }
 // plano de hoje para um exercício (preparatórias e séries de trabalho), se ele está no treino do dia
 function planoDoExercicio(exId) {
@@ -230,7 +240,7 @@ function renderHero(el, e) {
   el.innerHTML = `<div class="card hero" id="card-dia">
     <div class="hero-top"><div class="hero-txt">${txt}</div><span class="hero-corpo">${corpoMini(t.musculos)}</span></div>
     ${andamento ? tilesHoje() : ''}
-    <div class="plano"><div class="plano-cab"><span id="plano-versao">${esc(t.nome)} ${plano.v} · ${esc(plano.foco)}</span><span>${andamento ? 'hoje' : 'alvo de hoje'}</span></div>${linhas}</div>
+    <div class="plano"><div class="plano-cab"><span id="plano-versao">${esc(t.nome)} ${plano.v} · ${esc(plano.foco)}${plano.extra ? ' · +1 série (1x na semana)' : ''}</span><span>${andamento ? 'hoje' : 'alvo de hoje'}</span></div>${linhas}</div>
     <div class="hero-acao">${acao}</div></div>`;
   const bt = $('bt-comecar');
   if (bt) bt.onclick = () => comecarTreino(t, itens);
